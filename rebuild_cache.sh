@@ -5,8 +5,8 @@ echo "Rebuilding virtual environment and installing dependencies..."
 # Recreate Python virtual environment and install dependencies
 python3 -m venv .venv
 source .venv/bin/activate
-pip install --upgrade pip
-pip install -r requirements.txt
+pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org --upgrade pip
+pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org -r requirements.txt
 
 # Reinstall Electron app dependencies
 echo "Installing Electron app dependencies..."
