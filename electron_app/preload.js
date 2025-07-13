@@ -4,13 +4,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openDirectoryDialog: () => ipcRenderer.invoke('dialog:openDirectory'),
   openFile: (filePath) => ipcRenderer.send('file:open', filePath),
   relaunchApp: () => ipcRenderer.send('app:relaunch'),
+  getBackendConfig: () => ipcRenderer.invoke('get-backend-config'),
 });
 
 // Listen for status requests from the main process
-ipcRenderer.on('get-indexer-status', async () => {
+ipcRenderer.on('get-indexer-status', async (event, backendConfig) => {
   try {
-    // Assuming backend runs on the default port 8000 from config
-    const response = await fetch('http://127.0.0.1:8233/api/indexer/status');
+    const { listenIp, listenPort } = backendConfig;
+    const backendBaseUrl = `http://${listenIp}:${listenPort}`;
+    const response = await fetch(`${backendBaseUrl}/api/indexer/status`);
     if (response.ok) {
       const data = await response.json();
       ipcRenderer.send('update-title', data);

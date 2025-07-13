@@ -125,6 +125,11 @@ class SearchResult(BaseModel):
     metadata: SearchResultMetadata
     match_type: str
 
+class AppConfig(BaseModel):
+    version: str
+    backend_ip: str
+    backend_port: int
+
 # --- Helper Functions ---
 
 
@@ -206,6 +211,14 @@ async def get_indexer_status():
         "queue_size": db_manager.get_queue_size(),
         "active_threads": indexer_state.active_threads
     }
+
+@app.get("/api/app-config", response_model=AppConfig, tags=["System"])
+async def get_app_config():
+    return AppConfig(
+        version=config.get('VERS', section='general'),
+        backend_ip=config.get('LISTEN_IP', section='server'),
+        backend_port=int(config.get('LISTEN_PORT', section='server'))
+    )
 
 @app.post("/api/system/sync", tags=["System"])
 async def sync_database(background_tasks: BackgroundTasks):

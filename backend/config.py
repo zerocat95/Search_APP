@@ -12,7 +12,17 @@ class Config:
     def __init__(self, config_file='sa_config.cfg'):
         if not hasattr(self, 'initialized'):
             self.config = configparser.ConfigParser()
-            self.config.read(config_file)
+            
+            # Prioritize config from ~/.search_app/
+            app_data_dir = os.path.expanduser("~/.search_app")
+            user_config_path = os.path.join(app_data_dir, 'sa_config.cfg')
+
+            if os.path.exists(user_config_path):
+                self.config.read(user_config_path)
+            else:
+                # Fallback to the default config_file (e.g., from project root)
+                self.config.read(config_file)
+            
             self.initialized = True
 
     def get(self, key, section='database'):

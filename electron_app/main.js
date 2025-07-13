@@ -1,4 +1,5 @@
 const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 const kill = require('tree-kill');
@@ -6,7 +7,49 @@ const kill = require('tree-kill');
 let backendProcess = null;
 let mainWindow = null; // Make mainWindow accessible outside createWindow
 
-function createWindow() {
+// Function to read sa_config.cfg
+function readConfig() {
+  const appDataDir = path.join(app.getPath('home'), '.search_app');
+  const userConfigPath = path.join(appDataDir, 'sa_config.cfg');
+  const projectRootConfigPath = path.join(app.getAppPath(), '..', 'sa_config.cfg');
+
+  let configPath = projectRootConfigPath;
+  if (fs.existsSync(userConfigPath)) {
+    configPath = userConfigPath;
+  }
+
+  try {
+    const configContent = fs.readFileSync(configPath, 'utf8');
+    const lines = configContent.split('\n');
+    let listenIp = '127.0.0.1'; // Default
+    let listenPort = 8233; // Default
+    let inServerSection = false;
+
+    for (const line of lines) {
+      if (line.trim() === '[server]') {
+        inServerSection = true;
+        continue;
+      }
+      if (line.trim().startsWith('[') && line.trim().endsWith(']')) {
+        inServerSection = false;
+        continue;
+      }
+      if (inServerSection) {
+        if (line.startsWith('LISTEN_IP')) {
+          listenIp = line.split('=')[1].trim();
+        } else if (line.startsWith('LISTEN_PORT')) {
+          listenPort = parseInt(line.split('=')[1].trim(), 10);
+        }
+      }
+    }
+    return { listenIp, listenPort };
+  } catch (error) {
+    console.error('Error reading sa_config.cfg:', error);
+    return { listenIp: '127.0.0.1', listenPort: 8233 }; // Fallback
+  }
+}
+
+function createWindow(listenIp, listenPort) {
   mainWindow = new BrowserWindow({
     width: 1000,
     height: 800,
@@ -17,13 +60,18 @@ function createWindow() {
     },
   });
 
-  // Load the index.html of the app.
-  mainWindow.loadFile(path.join(__dirname, 'public', 'index.html'));
+  // Load the index.html of the app with a cache-busting parameter.
+  mainWindow.loadFile(path.join(__dirname, 'public', 'index.html'), { query: { v: Date.now() } });
+
+  // IPC Handler to send backend config to renderer
+  ipcMain.handle('get-backend-config', () => {
+    return { listenIp, listenPort };
+  });
 
   // Start polling for indexer status
   setInterval(() => {
     if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('get-indexer-status');
+      mainWindow.webContents.send('get-indexer-status', { listenIp, listenPort });
     }
   }, 5000); // 5 seconds
 
@@ -52,8 +100,9 @@ function startBackend() {
 }
 
 app.whenReady().then(() => {
+  const { listenIp, listenPort } = readConfig();
   startBackend();
-  createWindow();
+  createWindow(listenIp, listenPort);
 
   // IPC Handlers for directory selection and file opening
   ipcMain.handle('dialog:openDirectory', async () => {

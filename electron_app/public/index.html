@@ -432,7 +432,7 @@
                     这将删除所有空间、路径和所有索引数据。应用程序将重置为初始状态。
                 </p>
             </div>
-            <div class="version-info" id="version-info">Vers:0.0.3.250713_Dev</div>
+            <div class="version-info" id="version-info">Vers:loading...</div>
         </div>
     </div>
 
@@ -464,7 +464,8 @@
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             // --- CONFIG & STATE ---
-            const API_BASE_URL = 'http://localhost:8233/api';
+            let backendIp = '127.0.0.1'; // Default fallback
+            let backendPort = 8233; // Default fallback
             let state = {
                 spaces: [],
                 activeSpaceId: 'all',
@@ -529,7 +530,10 @@
                     };
                     if (body) options.body = JSON.stringify(body);
                     
-                    const response = await fetch(`${API_BASE_URL}${endpoint}`, options);
+                    // Dynamically construct the base URL using backendIp and backendPort
+                    const baseUrl = `http://${backendIp}:${backendPort}/api`;
+                    
+                    const response = await fetch(`${baseUrl}${endpoint}`, options);
                     if (!response.ok) {
                         const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
                         throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
@@ -1088,6 +1092,8 @@
             selectors.overlay.addEventListener('click', hideConfirmation);
 
             // --- INITIALIZATION ---
+            let backendConnectionAttemptStartTime = null; // Track when we started trying to connect
+
             const checkBackendStatus = async () => {
                 try {
                     const response = await fetch(`${API_BASE_URL}/status`);
@@ -1098,6 +1104,10 @@
                         selectors.appContainer.classList.remove('loading');
                         showNotification('服务程序加载完成.', 'success');
                         
+                        // Get app version after backend is ready
+                        const appConfig = await api.get('/app-config');
+                        document.getElementById('version-info').textContent = `Vers:${appConfig.version}`;
+
                         const currentTheme = localStorage.getItem('theme') || 'light';
                         document.documentElement.setAttribute('data-theme', currentTheme);
                         updateThemeToggle(currentTheme);
@@ -1112,9 +1122,23 @@
                         setTimeout(checkBackendStatus, 1000);
                     }
                 } catch (error) {
-                    selectors.loadingOverlay.querySelector('span').textContent = '无法连接到后端服务，正在重试...';
-                    console.log("Backend not ready, retrying in 2 seconds...");
-                    setTimeout(checkBackendStatus, 2000);
+                    const elapsedTime = Date.now() - backendConnectionAttemptStartTime;
+                    let message = '';
+                    let retryDelay = 1000; // Default retry every 1 second
+
+                    if (elapsedTime < 10000) { // First 10 seconds
+                        message = '等待程序初始化完成...';
+                        retryDelay = 1000;
+                    } else if (elapsedTime < 20000) { // 10 to 20 seconds
+                        message = '无法连接到后端服务,正在重试...';
+                        retryDelay = 2000;
+                    } else { // After 20 seconds
+                        message = '后端服务未能正常工作,请尝试退出程序重新开启.';
+                        retryDelay = 2000;
+                    }
+                    selectors.loadingOverlay.querySelector('span').textContent = message;
+                    console.log(`Backend not ready, retrying in ${retryDelay / 1000} seconds...`);
+                    setTimeout(checkBackendStatus, retryDelay);
                 }
             };
 
@@ -1130,9 +1154,29 @@
                 }
             };
 
-            const init = () => {
+            const init = async () => {
                 selectors.appContainer.classList.add('loading');
                 selectors.loadingOverlay.querySelector('span').textContent = '🕙服务程序正在加载...';
+
+                let configData;
+                try {
+                    if (window.electronAPI && typeof window.electronAPI.getBackendConfig === 'function') {
+                        configData = await window.electronAPI.getBackendConfig();
+                        backendIp = configData.listenIp;
+                        backendPort = configData.listenPort;
+                        API_BASE_URL = `http://${backendIp}:${backendPort}/api`;
+                    } else {
+                        console.error('window.electronAPI 或 getBackendConfig 方法不可用。');
+                        selectors.loadingOverlay.querySelector('span').textContent = '初始化失败：Electron API 未加载或方法缺失。请检查 preload.js。';
+                        return;
+                    }
+                } catch (error) {
+                    console.error('通过 IPC 获取后端配置失败:', error);
+                    selectors.loadingOverlay.querySelector('span').textContent = '初始化失败，请检查日志。详细错误: ' + error.message;
+                    return;
+                }
+
+                backendConnectionAttemptStartTime = Date.now();
                 checkBackendStatus();
 
                 selectors.themeToggleBtn.addEventListener('click', () => {
