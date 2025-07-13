@@ -1,0 +1,1165 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文档搜索</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            /* Light Theme */
+            --light-titlebar: rgba(245, 245, 247, 0.8);
+            --light-sidebar: #f5f5f7;
+            --light-background: #ffffff;
+            --light-border: #e0e0e0;
+            --light-blue: #000000; /* Changed from #0071e3 to black */
+            --light-blue-rgb: 0, 0, 0;
+            --light-red: #ff453a;
+            --light-red-rgb: 255, 69, 58;
+            --light-green: #30d158;
+            --light-gray: #8e8e93;
+            --light-text: #141415;
+            --light-shadow: rgba(0, 0, 0, 0.1);
+            --light-hover-bg: rgba(0, 0, 0, 0.05); /* Gray-black hover for light mode */
+            --light-active-bg: rgba(0, 0, 0, 0.1); /* Gray-black active for light mode */
+            --light-results-info-bg: #f7f7f7; /* Light background for results info */
+            --light-btn-primary-text: white;
+            --light-list-item-bg: #f7f7f7;
+            --light-input-bg: #f0f0f0;
+            --light-grabbing-bg: #eef;
+            --light-overlay-bg: rgba(0, 0, 0, 0.4);
+            --light-dialog-bg: white;
+            --light-dialog-footer-bg: #f9f9f9;
+            --light-notification-bg: white;
+
+            /* Dark Theme */
+            --dark-titlebar: rgba(30, 30, 30, 0.8);
+            --dark-sidebar: #2a2a2a;
+            --dark-background: #3a3a3a; /* Dark gray background */
+            --dark-border: #4a4a4a;
+            --dark-blue: #ffffff; /* Changed from #0071e3 to white */
+            --dark-blue-rgb: 255, 255, 255;
+            --dark-red: #ff453a;
+            --dark-red-rgb: 255, 69, 58;
+            --dark-green: #30d158;
+            --dark-gray: #b0b0b0;
+            --dark-text: #f0f0f0;
+            --dark-shadow: rgba(0, 0, 0, 0.4);
+            --dark-hover-bg: rgba(255, 255, 255, 0.08); /* Light hover for dark mode */
+            --dark-active-bg: rgba(255, 255, 255, 0.15); /* Light active for dark mode */
+            --dark-results-info-bg: #2a2a2a; /* Dark background for results info */
+            --dark-btn-primary-text: black;
+            --dark-list-item-bg: #333333;
+            --dark-input-bg: #2a2a2a;
+            --dark-grabbing-bg: #444444;
+            --dark-overlay-bg: rgba(0, 0, 0, 0.6);
+            --dark-dialog-bg: #2a2a2a;
+            --dark-dialog-footer-bg: #333333;
+            --dark-notification-bg: #2a2a2a;
+
+            /* Default to Light Theme */
+            --macos-titlebar: var(--light-titlebar);
+            --macos-sidebar: var(--light-sidebar);
+            --macos-background: var(--light-background);
+            --macos-border: var(--light-border);
+            --macos-blue: var(--light-blue);
+            --macos-red: var(--light-red);
+            --macos-green: var(--light-green);
+            --macos-gray: var(--light-gray);
+            --macos-text: var(--light-text);
+            --macos-shadow: var(--light-shadow);
+            --macos-hover-bg: var(--light-hover-bg);
+            --macos-active-bg: var(--light-active-bg);
+            --macos-results-info-bg: var(--light-results-info-bg);
+            --macos-btn-primary-text: var(--light-btn-primary-text);
+            --macos-blue-rgb: var(--light-blue-rgb);
+            --macos-red-rgb: var(--light-red-rgb);
+            --macos-list-item-bg: var(--light-list-item-bg);
+            --macos-input-bg: var(--light-input-bg);
+            --macos-grabbing-bg: var(--light-grabbing-bg);
+            --macos-overlay-bg: var(--light-overlay-bg);
+            --macos-dialog-bg: var(--light-dialog-bg);
+            --macos-dialog-footer-bg: var(--light-dialog-footer-bg);
+            --macos-notification-bg: var(--light-notification-bg);
+        }
+
+        html[data-theme='dark'] {
+            --macos-titlebar: var(--dark-titlebar);
+            --macos-sidebar: var(--dark-sidebar);
+            --macos-background: var(--dark-background);
+            --macos-border: var(--dark-border);
+            --macos-blue: var(--dark-blue);
+            --macos-red: var(--dark-red);
+            --macos-green: var(--dark-green);
+            --macos-gray: var(--dark-gray);
+            --macos-text: var(--dark-text);
+            --macos-shadow: var(--dark-shadow);
+            --macos-hover-bg: var(--dark-hover-bg);
+            --macos-active-bg: var(--dark-active-bg);
+            --macos-results-info-bg: var(--dark-results-info-bg);
+            --macos-btn-primary-text: var(--dark-btn-primary-text);
+            --macos-blue-rgb: var(--dark-blue-rgb);
+            --macos-red-rgb: var(--dark-red-rgb);
+            --macos-list-item-bg: var(--dark-list-item-bg);
+            --macos-input-bg: var(--dark-input-bg);
+            --macos-grabbing-bg: var(--dark-grabbing-bg);
+            --macos-overlay-bg: var(--dark-overlay-bg);
+            --macos-dialog-bg: var(--dark-dialog-bg);
+            --macos-dialog-footer-bg: var(--dark-dialog-footer-bg);
+            --macos-notification-bg: var(--dark-notification-bg);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif; }
+        html, body { height: 100%; }
+        body { background-color: var(--macos-background); color: var(--macos-text); height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            transition: filter 0.3s ease;
+        }
+
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.2em;
+            z-index: 1000;
+            opacity: 1;
+            transition: opacity 0.3s ease;
+            text-align: center;
+            line-height: 1.6;
+        }
+
+        .loading-overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .app-container.loading {
+            filter: blur(5px) brightness(0.8);
+        }
+
+        /* --- Layout --- */
+        .titlebar { height: 50px; background: var(--macos-titlebar); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--macos-border); display: flex; align-items: center; padding: 0 15px; position: relative; z-index: 100; flex-shrink: 0; }
+        .main-container { display: flex; flex: 1; overflow: hidden; }
+        .sidebar { width: 240px; background: var(--macos-sidebar); border-right: 1px solid var(--macos-border); padding: 15px 0; display: flex; flex-direction: column; transition: width 0.2s; flex-shrink: 0; }
+        .content { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--macos-background); min-width: 600px; }
+        .search-container { padding: 20px; border-bottom: 1px solid var(--macos-border); background: var(--macos-background); flex-shrink: 0; }
+        .results-info { padding: 10px 20px; font-size: 13px; color: var(--macos-gray); border-bottom: 1px solid var(--macos-border); background: var(--macos-results-info-bg); flex-shrink: 0; }
+        .results-container { flex: 1; overflow-y: auto; min-height: 0; height: 0; flex-basis: 0; }
+
+        /* --- Titlebar --- */
+        .titlebar-traffic-lights { display: flex; gap: 8px; }
+        .traffic-light { width: 12px; height: 12px; border-radius: 50%; }
+        .traffic-close { background-color: #ff5f57; }
+        .traffic-min { background-color: #febc2e; }
+        .traffic-max { background-color: #28c840; }
+        .app-title { position: absolute; left: 50%; transform: translateX(-50%); font-size: 14px; font-weight: 500; }
+
+        /* --- Sidebar --- */
+        .sidebar-menu { flex-grow: 1; overflow-y: auto; padding: 0 10px; height: 0; flex-basis: 0; }
+        .sidebar-item { display: flex; align-items: center; padding: 10px; border-radius: 8px; cursor: pointer; transition: background 0.2s; font-size: 14px; margin-bottom: 4px; }
+        .sidebar-item:hover { background: var(--macos-hover-bg); }
+        .sidebar-item.active { background: var(--macos-active-bg); color: var(--macos-blue); font-weight: 500; }
+        .sidebar-item i { margin-right: 12px; width: 20px; text-align: center; }
+        .sidebar-footer { padding: 0 10px; }
+
+        /* --- Search --- */
+        .search-box { position: relative; max-width: 800px; margin: 0 auto; }
+        .search-input { width: 100%; padding: 12px 20px 12px 45px; font-size: 16px; border: 1px solid var(--macos-border); border-radius: 10px; background: var(--macos-input-bg); color: var(--macos-text); transition: all 0.2s; outline: none; }
+        .search-input:focus { background: var(--macos-background); border-color: var(--macos-blue); box-shadow: 0 0 0 3px rgba(var(--macos-blue-rgb), 0.2); }
+        .search-icon { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: var(--macos-gray); }
+        .spinner { position: absolute; right: 15px; top: 50%; transform: translateY(-50%); font-size: 16px; color: var(--macos-gray); display: none; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: translateY(-50%) rotate(0deg); } 100% { transform: translateY(-50%) rotate(360deg); } }
+
+        /* --- Results --- */
+        .result-item { padding: 15px 20px; border-bottom: 1px solid var(--macos-border); cursor: pointer; transition: background 0.2s; }
+        .result-item:hover { background: var(--macos-hover-bg); }
+        .result-title { font-weight: 600; margin-bottom: 5px; display: flex; align-items: center; }
+        .result-title i { margin-right: 8px; color: var(--macos-blue); }
+        .result-snippet { color: var(--macos-text); font-size: 14px; margin-bottom: 8px; line-height: 1.5; }
+        .result-path { font-size: 12px; color: var(--macos-gray); display: flex; align-items: center; }
+        .open-file-btn { background: none; border: none; color: var(--macos-gray); font-size: 14px; margin-right: 8px; cursor: pointer; padding: 4px; border-radius: 4px; transition: background 0.2s; }
+        .open-file-btn:hover { background: var(--macos-hover-bg); }
+        .empty-state { text-align: center; padding: 50px; color: var(--macos-gray); }
+        .highlight { background-color: rgba(255, 204, 0, 0.4); padding: 0 2px; border-radius: 3px; }
+
+        /* --- Settings Panel --- */
+        .settings-panel { position: fixed; top: 0; right: -480px; width: 480px; height: 100%; background: var(--macos-background); box-shadow: -5px 0 15px var(--macos-shadow); z-index: 200; transition: right 0.3s ease; display: flex; flex-direction: column; }
+        .settings-panel.open { right: 0; }
+        .settings-header { padding: 20px; border-bottom: 1px solid var(--macos-border); display: flex; justify-content: space-between; align-items: center; }
+        .settings-title { font-size: 20px; font-weight: 500; }
+        .close-settings { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--macos-gray); width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+        .close-settings:hover { background: var(--macos-hover-bg); }
+        .settings-content { flex: 1; overflow-y: auto; padding: 20px; }
+        .settings-section { margin-bottom: 30px; }
+        .section-title { font-size: 16px; font-weight: 500; margin-bottom: 15px; padding-bottom: 8px; border-bottom: 1px solid var(--macos-border); }
+        .form-group { margin-bottom: 15px; }
+        .form-label { display: block; margin-bottom: 5px; font-size: 14px; font-weight: 500; }
+        .form-input { width: 100%; padding: 10px 12px; border: 1px solid var(--macos-border); border-radius: 8px; font-size: 14px; transition: border 0.2s; background: var(--macos-input-bg); color: var(--macos-text); }
+        .form-input:focus { border-color: var(--macos-blue); outline: none; }
+        .btn { padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s; border: none; }
+        .btn-primary { background: var(--macos-blue); color: var(--macos-btn-primary-text); }
+        .btn-primary:hover { background: rgba(var(--macos-blue-rgb), 0.8); } /* Darken primary color for hover */
+        .btn-danger { background: var(--macos-red); color: white; }
+        .btn-danger:hover { background: rgba(var(--macos-red-rgb), 0.8); } /* Darken red for hover */
+
+        /* --- Space Management --- */
+        .space-list { list-style: none; padding: 0; }
+        .space-list-item { padding: 12px; border-radius: 8px; margin-bottom: 10px; background: var(--macos-list-item-bg); border: 1px solid var(--macos-border); cursor: grab; }
+        .space-list-item:grabbing { cursor: grabbing; background: var(--macos-grabbing-bg); }
+        .space-list-item .space-header { display: flex; align-items: center; justify-content: space-between; }
+        .space-info { flex-grow: 1; }
+        .space-name { font-weight: 500; }
+        .space-path { font-size: 12px; color: var(--macos-gray); margin-top: 2px; }
+        .space-actions button { background: none; border: none; cursor: pointer; color: var(--macos-gray); padding: 5px; font-size: 14px; }
+        .space-actions button:hover { color: var(--macos-blue); }
+        .space-details { font-size: 12px; color: var(--macos-gray); margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--macos-border); }
+        .space-edit-form { display: none; margin-top: 10px; }
+        .space-list-item.editing .space-edit-form { display: block; }
+        .space-list-item.editing .space-info, .space-list-item.editing .space-details { display: none; }
+
+        /* --- Progress Bar --- */
+        .progress-bar-container {
+            width: 100%;
+            height: 8px;
+            background-color: var(--macos-input-bg);
+            border-radius: 4px;
+            margin-top: 8px;
+            overflow: hidden;
+        }
+        .progress-bar {
+            height: 100%;
+            background-color: var(--macos-blue);
+            border-radius: 4px;
+            transition: width 0.3s ease-in-out;
+        }
+        .progress-text {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            margin-top: 4px;
+        }
+
+        /* --- Path Management --- */
+        .path-list { list-style: none; padding: 0; margin-top: 10px; }
+        .path-list-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; background: var(--macos-input-bg); border-radius: 6px; margin-bottom: 5px; font-size: 13px; }
+        .path-list-item .path-text { flex-grow: 1; margin-right: 10px; }
+        .path-list-item button { background: none; border: none; color: var(--macos-red); cursor: pointer; font-size: 12px; }
+        .path-list-item button:hover { text-decoration: underline; }
+        .browse-btn { margin-left: 10px; padding: 8px 12px; font-size: 13px; }
+
+        /* --- Utility & General --- */
+        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--macos-overlay-bg); backdrop-filter: blur(2px); z-index: 350; display: none; }
+        .overlay.show { display: block; }
+        .confirmation-dialog { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--macos-dialog-bg); border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); z-index: 400; width: 400px; display: none; }
+        .confirmation-dialog.open { display: block; }
+        .dialog-header { padding: 20px; text-align: center; }
+        .dialog-title { font-size: 18px; font-weight: 500; margin-bottom: 5px; }
+        .dialog-message { color: var(--macos-gray); font-size: 14px; }
+        .dialog-footer { padding: 15px 20px; display: flex; justify-content: flex-end; gap: 10px; background: var(--macos-dialog-footer-bg); }
+        .notification { position: fixed; bottom: 20px; right: 20px; background: var(--macos-notification-bg); border-radius: 12px; padding: 15px 20px; box-shadow: 0 5px 20px rgba(0,0,0,0.15); display: flex; align-items: center; transform: translateY(100px); opacity: 0; transition: all 0.3s ease; z-index: 500; }
+        .notification.show { transform: translateY(0); opacity: 1; }
+        .notification-icon { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 12px; flex-shrink: 0; }
+        .notification-success .notification-icon { background: rgba(48, 209, 88, 0.2); color: var(--macos-green); }
+        .notification-error .notification-icon { background: rgba(255, 69, 58, 0.2); color: var(--macos-red); }
+
+        .reset-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--macos-overlay-bg);
+            backdrop-filter: blur(5px);
+            color: var(--macos-text);
+            display: none; /* Hidden by default */
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            z-index: 1100;
+        }
+        .reset-overlay.show {
+            display: flex;
+        }
+        .reset-content {
+            background: var(--macos-dialog-bg);
+            padding: 40px;
+            border-radius: 14px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        .reset-content h2 {
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        .reset-content p {
+            margin-bottom: 25px;
+            color: var(--macos-gray);
+        }
+
+        .version-info {
+            padding: 10px; /* 与 sidebar-item 保持一致的内边距 */
+            font-size: 12px; /* 稍微小一点的字体 */
+            color: var(--macos-gray); /* 使用灰色，与辅助信息保持一致 */
+            margin-top: 10px; /* 与上方元素保持一定距离 */
+            text-align: center; /* 居中显示 */
+        }
+    </style>
+</head>
+<body>
+    <div class="loading-overlay">
+        <div class="loading-spinner"></div>
+        <span>客户端js执行错误</span>
+    </div>
+
+    <div class="app-container">
+    <!--
+    <div class="titlebar">
+        <div class="titlebar-traffic-lights">
+            <div class="traffic-light traffic-close"></div>
+            <div class="traffic-light traffic-min"></div>
+            <div class="traffic-light traffic-max"></div>
+        </div>
+        <div class="app-title">文档搜索 - <span id="indexer-status">空闲</span></div>
+    </div>
+     -->
+
+    <div class="main-container">
+        <div class="sidebar">
+            <div class="sidebar-menu" id="sidebar-menu">
+                <!-- Dynamic spaces will be injected here -->
+            </div>
+            <div class="sidebar-footer">
+                <div class="sidebar-item" id="ai-assistant-btn">
+                    <i class="fas fa-robot"></i> 智能助手
+                </div>
+
+                <div class="sidebar-item" id="theme-toggle-btn">
+                    <i class="fas fa-sun"></i> <span id="theme-toggle-text">亮色模式</span>
+                </div>
+                
+                <div class="sidebar-item" id="settings-btn">
+                    <i class="fas fa-cog"></i> 设置
+                </div>
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="search-container">
+                <div class="search-box">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" class="search-input" placeholder="搜索文档...">
+                    <i class="fas fa-spinner spinner" id="search-spinner"></i>
+                </div>
+            </div>
+            <div class="results-info" id="results-info">欢迎！选择一个空间并开始搜索。</div>
+            <div class="results-container" id="results-container">
+                <div class="empty-state">您的搜索结果将显示在这里。</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="settings-panel" id="settings-panel">
+        <div class="settings-header">
+            <div class="settings-title">设置</div>
+            <button class="close-settings" id="close-settings"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="settings-content">
+            <div class="settings-section">
+                <div class="section-title">空间管理</div>
+                <ul class="space-list" id="space-list-settings"></ul>
+                <div id="space-list-empty-state" class="empty-state" style="display: none; padding: 20px 0;">尚未创建空间。</div>
+            </div>
+            <div class="settings-section">
+                <div class="section-title">添加新空间</div>
+                <form id="add-space-form">
+                    <div class="form-group">
+                        <label class="form-label">空间名称</label>
+                        <input type="text" id="new-space-name" class="form-input" placeholder="例如：项目文档" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">添加空间</button>
+                </form>
+            </div>
+
+            <div class="settings-section">
+                <div class="section-title">管理空间路径</div>
+                <div class="form-group">
+                    <label class="form-label">选择空间</label>
+                    <select id="select-space-for-paths" class="form-input"></select>
+                </div>
+                <ul class="path-list" id="path-list"></ul>
+                <div id="path-list-empty-state" class="empty-state" style="display: none; padding: 20px 0;">此空间尚未添加路径。</div>
+                <div class="form-group" style="display: flex; align-items: flex-end;">
+                    <div style="flex-grow: 1;">
+                        <label class="form-label">新路径</label>
+                        <input type="text" id="new-path-input" class="form-input" placeholder="/Users/user/Documents/Projects">
+                    </div>
+                    <button class="btn btn-outline browse-btn" id="browse-path-btn">浏览...</button>
+                    <button class="btn btn-primary browse-btn" id="add-path-btn">添加路径</button>
+                </div>
+                <p style="font-size: 12px; color: var(--macos-gray); margin-top: 5px;">
+                    注意：在桌面应用程序（例如 Electron）中，'浏览...' 按钮将打开一个本地文件夹选择对话框。
+                </p>
+            </div>
+
+            <div class="settings-section">
+                <div class="section-title">高级设置</div>
+                <button class="btn btn-primary" id="start-all-indexing-btn" style="margin-bottom: 10px;">
+                    <i class="fas fa-sync-alt"></i> 开始所有索引
+                </button>
+                <p style="font-size: 13px; color: var(--macos-gray); margin-bottom: 20px;">
+                    这将触发所有空间的索引。系统将只处理新的或修改过的文件。
+                </p>
+                <button class="btn btn-danger" id="sync-deleted-files-btn">
+                    <i class="fas fa-sync"></i> 整理索引数据库
+                </button>
+                <p style="font-size: 13px; color: var(--macos-gray); margin-top: 10px;">
+                    这将扫描数据库并删除已从您的计算机中删除的任何文件。
+                </p>
+                <button class="btn btn-danger" id="factory-reset-btn" style="margin-top: 20px;">
+                    <i class="fas fa-exclamation-triangle"></i> 恢复出厂设置
+                </button>
+                <p style="font-size: 13px; color: var(--macos-gray); margin-top: 10px;">
+                    这将删除所有空间、路径和所有索引数据。应用程序将重置为初始状态。
+                </p>
+            </div>
+            <div class="version-info" id="version-info">Vers:0.0.3.250713_Dev</div>
+        </div>
+    </div>
+
+    <div class="overlay" id="overlay"></div>
+    <div class="confirmation-dialog" id="confirmation-dialog">
+        <div class="dialog-header">
+            <div class="dialog-title" id="dialog-title"></div>
+            <div class="dialog-message" id="dialog-message"></div>
+        </div>
+        <div class="dialog-footer">
+            <button class="btn btn-outline" id="cancel-action">取消</button>
+            <button class="btn" id="confirm-action">好的</button>
+        </div>
+    </div>
+
+    <div class="notification" id="notification">
+        <div class="notification-icon" id="notification-icon"></div>
+        <div class="notification-content" id="notification-message"></div>
+    </div>
+
+    <div class="reset-overlay" id="reset-overlay">
+        <div class="reset-content">
+            <h2 id="reset-title"></h2>
+            <p id="reset-message"></p>
+            <button class="btn btn-primary" id="reset-confirm-btn" style="display: none;">确认</button>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- CONFIG & STATE ---
+            const API_BASE_URL = 'http://localhost:8233/api';
+            let state = {
+                spaces: [],
+                activeSpaceId: 'all',
+                isLoading: false,
+                searchQuery: '',
+                selectedSpaceForPaths: null,
+                pathsForSelectedSpace: [],
+                pollingIntervalId: null, // For fast polling during indexing
+            };
+            let searchDebounceTimer;
+
+            // --- SELECTORS ---
+            const selectors = {
+                appContainer: document.querySelector('.app-container'),
+                loadingOverlay: document.querySelector('.loading-overlay'),
+                sidebarMenu: document.getElementById('sidebar-menu'),
+                searchInput: document.querySelector('.search-input'),
+                searchSpinner: document.getElementById('search-spinner'),
+                resultsContainer: document.getElementById('results-container'),
+                resultsInfo: document.getElementById('results-info'),
+                settingsBtn: document.getElementById('settings-btn'),
+                settingsPanel: document.getElementById('settings-panel'),
+                closeSettingsBtn: document.getElementById('close-settings'),
+                spaceListSettings: document.getElementById('space-list-settings'),
+                spaceListEmptyState: document.getElementById('space-list-empty-state'),
+                addSpaceForm: document.getElementById('add-space-form'),
+                newSpaceNameInput: document.getElementById('new-space-name'),
+                selectSpaceForPaths: document.getElementById('select-space-for-paths'),
+                pathList: document.getElementById('path-list'),
+                pathListEmptyState: document.getElementById('path-list-empty-state'),
+                newPathInput: document.getElementById('new-path-input'),
+                browsePathBtn: document.getElementById('browse-path-btn'),
+                addPathBtn: document.getElementById('add-path-btn'),
+                startAllIndexingBtn: document.getElementById('start-all-indexing-btn'),
+                factoryResetBtn: document.getElementById('factory-reset-btn'),
+                syncDeletedFilesBtn: document.getElementById('sync-deleted-files-btn'),
+                overlay: document.getElementById('overlay'),
+                confirmationDialog: document.getElementById('confirmation-dialog'),
+                dialogTitle: document.getElementById('dialog-title'),
+                dialogMessage: document.getElementById('dialog-message'),
+                cancelActionBtn: document.getElementById('cancel-action'),
+                confirmActionBtn: document.getElementById('confirm-action'),
+                notification: document.getElementById('notification'),
+                notificationIcon: document.getElementById('notification-icon'),
+                notificationMessage: document.getElementById('notification-message'),
+                themeToggleBtn: document.getElementById('theme-toggle-btn'),
+                themeToggleText: document.getElementById('theme-toggle-text'),
+                aiAssistantBtn: document.getElementById('ai-assistant-btn'),
+                resetOverlay: document.getElementById('reset-overlay'),
+                resetTitle: document.getElementById('reset-title'),
+                resetMessage: document.getElementById('reset-message'),
+                resetConfirmBtn: document.getElementById('reset-confirm-btn'),
+                indexerStatus: document.getElementById('indexer-status'),
+            };
+
+            // --- API HELPERS ---
+            const api = {
+                async request(method, endpoint, body = null) {
+                    const options = {
+                        method,
+                        headers: { 'Content-Type': 'application/json' },
+                    };
+                    if (body) options.body = JSON.stringify(body);
+                    
+                    const response = await fetch(`${API_BASE_URL}${endpoint}`, options);
+                    if (!response.ok) {
+                        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+                        throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+                    }
+                    return response.status === 204 ? null : response.json();
+                },
+                get(endpoint) { return this.request('GET', endpoint); },
+                post(endpoint, body) { return this.request('POST', endpoint, body); },
+                patch(endpoint, body) { return this.request('PATCH', endpoint, body); },
+                delete(endpoint) { return this.request('DELETE', endpoint); },
+            };
+
+            // --- ETA & FORMATTING ---
+            function formatEta(milliseconds) {
+                if (milliseconds === Infinity || isNaN(milliseconds)) {
+                    return '计算中...';
+                }
+                const seconds = Math.round(milliseconds / 1000);
+                if (seconds < 60) {
+                    return `${seconds} 秒`;
+                }
+                const minutes = Math.floor(seconds / 60);
+                const remainingSeconds = seconds % 60;
+                return `${minutes} 分 ${remainingSeconds} 秒`;
+            }
+
+            // --- RENDER FUNCTIONS ---
+            const render = () => {
+                // Render Sidebar
+                const sidebarItems = state.spaces.map(s => `
+                    <div class="sidebar-item ${state.activeSpaceId == s.id ? 'active' : ''}" data-space-id="${s.id}">
+                        <i class="fas fa-folder"></i> <span>${s.name}</span>
+                    </div>`).join('');
+                selectors.sidebarMenu.innerHTML = `
+                    <div class="sidebar-item ${state.activeSpaceId === 'all' ? 'active' : ''}" data-space-id="all">
+                        <i class="fas fa-search"></i> <span>所有空间</span>
+                    </div>
+                    ${sidebarItems}`;
+
+                // Render Settings Space List
+                selectors.spaceListEmptyState.style.display = state.spaces.length === 0 ? 'block' : 'none';
+                selectors.spaceListSettings.innerHTML = state.spaces.map(s => {
+                    let detailsHtml = '';
+                    if (s.status === 'indexing') {
+                        const completed = s.completed_count || 0;
+                        const failed = s.failed_count || 0;
+                        const processed = s.processed_files_count || 0;
+                        const total = s.total_files_to_process || 0;
+                        const progress = total > 0 ? (processed / total) * 100 : 0;
+
+                        let eta = '计算中...';
+                        if (s.startTime && processed > 0) {
+                            const elapsedTime = Date.now() - s.startTime;
+                            const itemsPerMs = processed / elapsedTime;
+                            const remainingItems = total - processed;
+                            const remainingTime = remainingItems > 0 ? remainingItems / itemsPerMs : 0;
+                            eta = formatEta(remainingTime);
+                        }
+
+                        detailsHtml = `
+                            <div class="progress-bar-container">
+                                <div class="progress-bar" style="width: ${progress.toFixed(2)}%;"></div>
+                            </div>
+                            <div class="progress-text">
+                                <span>总进度: ${processed}/${total}</span>
+                                <span>成功: ${completed}, 失败: ${failed}</span>
+                                <span>预计剩余: ${eta}</span>
+                            </div>
+                        `;
+                    } else {
+                        detailsHtml = `
+                            状态：${s.status || '空闲'} | 文件：${s.indexed_file_count || 0} | 最后索引：${s.last_indexed_at ? new Date(s.last_indexed_at).toLocaleString() : 'N/A'}
+                        `;
+                    }
+
+                    return `
+                    <li class="space-list-item" data-space-id="${s.id}" draggable="true">
+                        <div class="space-header">
+                            <div class="space-info">
+                                <div class="space-name">${s.name}</div>
+                            </div>
+                            <div class="space-actions">
+                                <button data-action="edit"><i class="fas fa-pencil-alt"></i></button>
+                                <button data-action="delete"><i class="fas fa-trash"></i></button>
+                            </div>
+                        </div>
+                        <div class="space-details">${detailsHtml}</div>
+                        <div class="space-actions" style="margin-top: 5px;">
+                             <button class="btn btn-outline btn-sm" data-action="reindex" style="padding: 4px 8px; font-size: 12px;">重新索引</button>
+                             <button class="btn btn-danger btn-sm" data-action="clear-index" style="padding: 4px 8px; font-size: 12px;">清除索引</button>
+                        </div>
+                        <div class="space-edit-form">
+                            <div class="form-group"><input type="text" class="form-input" value="${s.name}"></div>
+                            <button class="btn btn-primary btn-sm" data-action="save">保存</button>
+                            <button class="btn btn-outline btn-sm" data-action="cancel-edit">取消</button>
+                        </div>
+                    </li>`;
+                }).join('');
+
+                // Render Space Select for Path Management
+                selectors.selectSpaceForPaths.innerHTML = '<option value="">-- 选择一个空间 --</option>' +
+                    state.spaces.map(s => `<option value="${s.id}" ${state.selectedSpaceForPaths == s.id ? 'selected' : ''}>${s.name}</option>`).join('');
+                
+                // Render Paths for Selected Space
+                selectors.pathListEmptyState.style.display = state.pathsForSelectedSpace.length === 0 ? 'block' : 'none';
+                selectors.pathList.innerHTML = state.pathsForSelectedSpace.map(p => `
+                    <li class="path-list-item" data-path-id="${p.id}">
+                        <span class="path-text">${p.path}</span>
+                        <button data-action="delete-path"><i class="fas fa-trash"></i></button>
+                    </li>
+                `).join('');
+            };
+
+            // --- POLLING LOGIC ---
+            const stopStatusPolling = () => {
+                if (state.pollingIntervalId) {
+                    clearInterval(state.pollingIntervalId);
+                    state.pollingIntervalId = null;
+                }
+            };
+
+            const startStatusPolling = (spaceId) => {
+                stopStatusPolling(); // Stop any existing poller
+
+                state.pollingIntervalId = setInterval(async () => {
+                    try {
+                        const statusData = await api.get(`/spaces/${spaceId}/index/status`);
+                        const space = state.spaces.find(s => s.id == spaceId);
+                        if (space) {
+                            // Preserve startTime if it exists
+                            const startTime = space.startTime;
+                            Object.assign(space, statusData);
+                            if (statusData.status === 'indexing' && startTime) {
+                                space.startTime = startTime;
+                            }
+
+                            if (statusData.status !== 'indexing') {
+                                stopStatusPolling();
+                                delete space.startTime; // Clean up
+                                showNotification(`空间 "${space.name}" 索引完成。`, 'success');
+                            }
+                            render();
+                        } else {
+                            stopStatusPolling();
+                        }
+                    } catch (error) {
+                        console.error(`Polling failed for space ${spaceId}:`, error);
+                        stopStatusPolling();
+                    }
+                }, 1000); // Poll every 1 second
+            };
+
+            // --- EVENT HANDLERS & LOGIC ---
+            const loadSpaces = async () => {
+                try {
+                    const spacesData = await api.get('/spaces');
+                    const spaceStatuses = await Promise.all(spacesData.map(s => api.get(`/spaces/${s.id}/index/status`).catch(() => ({}))));
+                    
+                    state.spaces = spacesData.map((s, i) => ({ ...s, ...spaceStatuses[i] }));
+                    
+                    // Check if any space is already indexing and start polling if so
+                    const indexingSpace = state.spaces.find(s => s.status === 'indexing');
+                    if (indexingSpace && !state.pollingIntervalId) {
+                        const space = state.spaces.find(s => s.id == indexingSpace.id);
+                        space.startTime = Date.now(); // Assume it just started for ETA calculation
+                        startStatusPolling(indexingSpace.id);
+                    }
+
+                    render();
+                    if (state.selectedSpaceForPaths) {
+                        loadPathsForSelectedSpace(state.selectedSpaceForPaths);
+                    }
+                } catch (error) { console.error('Failed to load spaces:', error); }
+            };
+
+            const loadPathsForSelectedSpace = async (spaceId) => {
+                if (!spaceId) {
+                    state.pathsForSelectedSpace = [];
+                    render();
+                    return;
+                }
+                try {
+                    state.pathsForSelectedSpace = await api.get(`/spaces/${spaceId}/paths`);
+                    render();
+                } catch (error) {
+                    console.error('Failed to load paths for space:', error);
+                    state.pathsForSelectedSpace = [];
+                    render();
+                }
+            };
+
+            const handleSearch = async () => {
+                if (!state.searchQuery) {
+                    selectors.resultsContainer.innerHTML = '<div class="empty-state">您的搜索结果将显示在这里</div>';
+                    selectors.resultsInfo.textContent = '欢迎！选择一个空间并开始搜索.';
+                    return;
+                }
+                setLoading(true);
+                try {
+                    const endpoint = state.activeSpaceId === 'all'
+                        ? `/search?q=${encodeURIComponent(state.searchQuery)}`
+                        : `/search?q=${encodeURIComponent(state.searchQuery)}&space_id=${state.activeSpaceId}`;
+                    const results = await api.get(endpoint);
+                    selectors.resultsInfo.textContent = `找到 ${results.length} 条关于 "${state.searchQuery}" 的结果`;
+                    if (results.length === 0) {
+                        selectors.resultsContainer.innerHTML = `<div class="empty-state">未找到关于 "${state.searchQuery}" 的结果。</div>`;
+                    } else {
+                        const keywords = state.searchQuery.toLowerCase().split(' ').filter(k => k);
+                        const keywordRegex = new RegExp(`(${keywords.join('|')})`, 'gi');
+                        selectors.resultsContainer.innerHTML = results.map(res => {
+                            const snippet = res.document || '无内容预览';
+                            const displaySnippet = snippet.replace(keywordRegex, '<span class="highlight">$&</span>');
+                            const filePath = res.metadata.file_path || '未知文件路径';
+                            const displayFilePath = filePath.replace(keywordRegex, '<span class="highlight">$&</span>');
+                            return `
+                                <div class="result-item" data-filepath="${filePath}">
+                                    <div class="result-snippet">${displaySnippet}</div>
+                                    <div class="result-path">
+                                        <button class="open-file-btn" title="打开文件"><i class="fas fa-folder-open"></i></button>
+                                        文件：${displayFilePath} | 分数：${res.metadata.score.toFixed(2)} | 空间ID：${res.metadata.space_id}
+                                    </div>
+                                </div>`;
+                        }).join('');
+                    }
+                } catch (error) { 
+                    console.error('Search failed:', error); 
+                }
+                finally { setLoading(false); }
+            };
+
+            const handleFilenameSearch = async () => {
+                if (!state.searchQuery) {
+                    selectors.resultsContainer.innerHTML = '<div class="empty-state">您的搜索结果将显示在这里</div>';
+                    selectors.resultsInfo.textContent = '欢迎！选择一个空间并开始搜索.';
+                    return;
+                }
+                setLoading(true);
+                try {
+                    const endpoint = state.activeSpaceId === 'all'
+                        ? `/search/filenames?q=${encodeURIComponent(state.searchQuery)}`
+                        : `/search/filenames?q=${encodeURIComponent(state.searchQuery)}&space_id=${state.activeSpaceId}`;
+                    const results = await api.get(endpoint);
+                    selectors.resultsInfo.textContent = `找到 ${results.length} 个文件名匹配的结果。按回车进行深度搜索。`;
+                    if (results.length === 0) {
+                        selectors.resultsContainer.innerHTML = `<div class="empty-state">未找到匹配的文件名。</div>`;
+                    } else {
+                        const keywords = state.searchQuery.toLowerCase().split(' ').filter(k => k);
+                        const keywordRegex = new RegExp(`(${keywords.join('|')})`, 'gi');
+                        selectors.resultsContainer.innerHTML = results.map(res => {
+                            const displayFilePath = res.path.replace(keywordRegex, '<span class="highlight">$&</span>');
+                            return `
+                                <div class="result-item" data-filepath="${res.path}">
+                                    <div class="result-path">
+                                        <button class="open-file-btn" title="打开文件"><i class="fas fa-folder-open"></i></button>
+                                        ${displayFilePath}
+                                    </div>
+                                </div>`;
+                        }).join('');
+                    }
+                } catch (error) { 
+                    console.error('Filename search failed:', error); 
+                }
+                finally { setLoading(false); }
+            };
+
+            selectors.searchInput.addEventListener('input', (e) => {
+                clearTimeout(searchDebounceTimer);
+                state.searchQuery = e.target.value.trim();
+                if (state.searchQuery) {
+                    searchDebounceTimer = setTimeout(handleFilenameSearch, 300);
+                } else {
+                    selectors.resultsContainer.innerHTML = '<div class="empty-state">您的搜索结果将显示在这里</div>';
+                    selectors.resultsInfo.textContent = '欢迎！选择一个空间并开始搜索.';
+                }
+            });
+
+            selectors.searchInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    clearTimeout(searchDebounceTimer);
+                    handleSearch();
+                }
+            });
+
+            selectors.sidebarMenu.addEventListener('click', (e) => {
+                const item = e.target.closest('.sidebar-item');
+                if (item) {
+                    state.activeSpaceId = item.dataset.spaceId;
+                    render();
+                    handleSearch();
+                }
+            });
+
+            selectors.resultsContainer.addEventListener('click', (e) => {
+                const openButton = e.target.closest('.open-file-btn');
+                if (openButton) {
+                    const filePath = openButton.closest('.result-item').dataset.filepath;
+                    if (filePath && window.electronAPI) {
+                        window.electronAPI.openFile(filePath);
+                    }
+                }
+            });
+
+            // --- Settings Panel Logic ---
+            selectors.settingsBtn.addEventListener('click', () => selectors.settingsPanel.classList.add('open'));
+            selectors.closeSettingsBtn.addEventListener('click', () => selectors.settingsPanel.classList.remove('open'));
+
+            selectors.addSpaceForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const name = selectors.newSpaceNameInput.value.trim();
+                if (!name) { showNotification('空间名称是必需的。', 'error'); return; }
+                try {
+                    await api.post('/spaces', { name });
+                    selectors.addSpaceForm.reset();
+                    showNotification('空间添加成功。', 'success');
+                    loadSpaces();
+                } catch (error) { console.error('Failed to add space:', error); }
+            });
+
+            selectors.spaceListSettings.addEventListener('click', async (e) => {
+                const listItem = e.target.closest('.space-list-item');
+                if (!listItem) return;
+                const spaceId = listItem.dataset.spaceId;
+                const action = e.target.closest('button')?.dataset.action;
+
+                switch (action) {
+                    case 'delete':
+                        showConfirmation('删除空间', '您确定要删除此空间吗？这将同时删除所有关联的路径和索引数据。', 'btn-danger', async () => {
+                            await api.delete(`/spaces/${spaceId}`);
+                            showNotification('空间已删除。', 'success');
+                            loadSpaces();
+                        });
+                        break;
+                    case 'reindex':
+                        showConfirmation('重新索引空间', '这将重新扫描并索引此空间中的所有文件。是否继续？', 'btn-primary', async () => {
+                            await api.post(`/spaces/${spaceId}/index`);
+                            const space = state.spaces.find(s => s.id == spaceId);
+                            if(space) space.startTime = Date.now(); // Record start time for ETA
+                            showNotification('索引已开始。', 'success');
+                            startStatusPolling(spaceId);
+                        });
+                        break;
+                    case 'clear-index':
+                        showConfirmation('清除索引', '这将删除此空间的所有索引数据。是否继续？', 'btn-danger', async () => {
+                            await api.delete(`/spaces/${spaceId}/index`);
+                            showNotification('索引已清除。', 'success');
+                            loadSpaces();
+                        });
+                        break;
+                    case 'edit':
+                        listItem.classList.add('editing');
+                        break;
+                    case 'cancel-edit':
+                        listItem.classList.remove('editing');
+                        break;
+                    case 'save':
+                        const newName = listItem.querySelector('.space-edit-form input').value.trim();
+                        await api.patch(`/spaces/${spaceId}`, { name: newName });
+                        showNotification('空间更新成功。', 'success');
+                        listItem.classList.remove('editing');
+                        loadSpaces();
+                        break;
+                }
+            });
+            
+            // --- Drag & Drop Reordering ---
+            let draggedItem = null;
+            selectors.spaceListSettings.addEventListener('dragstart', (e) => {
+                draggedItem = e.target.closest('.space-list-item');
+                setTimeout(() => draggedItem.style.opacity = '0.5', 0);
+            });
+            selectors.spaceListSettings.addEventListener('dragend', (e) => {
+                setTimeout(() => draggedItem.style.opacity = '', 0);
+                draggedItem = null;
+                const spaceIds = [...selectors.spaceListSettings.querySelectorAll('.space-list-item')].map(item => item.dataset.spaceId);
+                api.post('/spaces/reorder', { space_ids: spaceIds.map(Number) })
+                    .then(() => showNotification('空间已重新排序。', 'success'))
+                    .catch(err => console.error('Failed to reorder spaces:', err));
+            });
+            selectors.spaceListSettings.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                const afterElement = getDragAfterElement(selectors.spaceListSettings, e.clientY);
+                if (afterElement == null) {
+                    selectors.spaceListSettings.appendChild(draggedItem);
+                } else {
+                    selectors.spaceListSettings.insertBefore(draggedItem, afterElement);
+                }
+            });
+
+            function getDragAfterElement(container, y) {
+                const draggableElements = [...container.querySelectorAll('.space-list-item:not(.dragging)')];
+                return draggableElements.reduce((closest, child) => {
+                    const box = child.getBoundingClientRect();
+                    const offset = y - box.top - box.height / 2;
+                    if (offset < 0 && offset > closest.offset) {
+                        return { offset: offset, element: child };
+                    } else {
+                        return closest;
+                    }
+                }, { offset: Number.NEGATIVE_INFINITY }).element;
+            }
+
+            // --- Path Management Logic ---
+            selectors.selectSpaceForPaths.addEventListener('change', (e) => {
+                state.selectedSpaceForPaths = e.target.value ? parseInt(e.target.value) : null;
+                loadPathsForSelectedSpace(state.selectedSpaceForPaths);
+            });
+
+            selectors.addPathBtn.addEventListener('click', async () => {
+                if (!state.selectedSpaceForPaths) {
+                    showNotification('请先选择一个空间。', 'error');
+                    return;
+                }
+                const newPath = selectors.newPathInput.value.trim();
+                if (!newPath) {
+                    showNotification('路径不能为空。', 'error');
+                    return;
+                }
+                try {
+                    await api.post(`/spaces/${state.selectedSpaceForPaths}/paths`, { path: newPath });
+                    showNotification('路径添加成功。', 'success');
+                    selectors.newPathInput.value = '';
+                    loadPathsForSelectedSpace(state.selectedSpaceForPaths);
+                } catch (error) {
+                    console.error('Failed to add path:', error);
+                }
+            });
+
+            selectors.pathList.addEventListener('click', async (e) => {
+                const deleteBtn = e.target.closest('button[data-action="delete-path"]');
+                if (!deleteBtn) return;
+                const pathId = deleteBtn.closest('.path-list-item').dataset.pathId;
+                showConfirmation('删除路径', '您确定要删除此路径吗？这将从空间中删除它并影响索引。', 'btn-danger', async () => {
+                    try {
+                        await api.delete(`/spaces/${state.selectedSpaceForPaths}/paths/${pathId}`);
+                        showNotification('路径删除成功。', 'success');
+                        loadPathsForSelectedSpace(state.selectedSpaceForPaths);
+                    } catch (error) {
+                        console.error('Failed to delete path:', error);
+                    }
+                });
+            });
+
+            selectors.browsePathBtn.addEventListener('click', async () => {
+                const path = await window.electronAPI.openDirectoryDialog();
+                if (path) {
+                    selectors.newPathInput.value = path;
+                }
+            });
+
+            // --- Advanced Settings Logic ---
+            selectors.startAllIndexingBtn.addEventListener('click', () => {
+                showConfirmation(
+                    '🔔开始所有索引',
+                    '开始索引新建或修改的过的文件.\n如果目录中需要索引的文件较多,可能较为耗时.',
+                    'btn-primary',
+                    async () => {
+                        try {
+                            for (const space of state.spaces) {
+                                await api.post(`/spaces/${space.id}/index`);
+                                const s = state.spaces.find(sp => sp.id == space.id);
+                                if(s) s.startTime = Date.now();
+                                startStatusPolling(space.id);
+                            }
+                            showNotification('所有空间的索引已开始。', 'success');
+                        } catch (error) {
+                            console.error('Failed to start all indexing:', error);
+                        }
+                    }
+                );
+            });
+
+            selectors.factoryResetBtn.addEventListener('click', () => {
+                const title = '🚨恢复出厂设置';
+                const message = '警告:这个操作会删除掉索引数据库,并且无法撤销,后续您需要重新建立索引.\n提示:该操作不会删除您的原始文档';
+                showConfirmation(title, message, 'btn-danger', handleFactoryReset);
+            });
+
+            const handleFactoryReset = () => {
+                // 1. Show "Resetting" overlay
+                selectors.resetTitle.textContent = '恢复出厂设置中,请稍候';
+                selectors.resetMessage.textContent = '数据库索引正在被重置...';
+                selectors.resetConfirmBtn.style.display = 'none';
+                selectors.resetOverlay.classList.add('show');
+
+                // Call the API. We don't need to wait for the response,
+                // as the backend will exit.
+                api.post('/system/factory-reset').catch(err => {
+                    // Even if the API call fails to return (e.g., network error before send),
+                    // we proceed with the UI flow, as the goal is to restart.
+                    console.error("Factory reset API call failed, but proceeding with UI flow:", err);
+                });
+
+                // 2. After 5 seconds, update the message
+                setTimeout(() => {
+                    selectors.resetTitle.textContent = '✅ 重置成功';
+                    selectors.resetMessage.textContent = '恢复出厂设置成功,请重新打开程序。';
+                    
+                }, 5000);
+            };
+
+            selectors.resetConfirmBtn.addEventListener('click', () => {
+                // 3. Relaunch the app
+                if (window.electronAPI) {
+                    window.electronAPI.relaunchApp();
+                } else {
+                    // Fallback for browser environment
+                    location.reload();
+                }
+            });
+
+            selectors.syncDeletedFilesBtn.addEventListener('click', () => {
+                const title = '⭐️整理索引数据库';
+                const message = '这将从索引数据库中清理已经被删除的文件的索引记录.';
+                showConfirmation(title, message, 'btn-primary', async () => {
+                    try {
+                        await api.post('/system/sync');
+                        showNotification('整理索引数据库任务将在后台继续执行.', 'success');
+                    } catch (error) {
+                        console.error('Sync failed:', error);
+                    }
+                });
+            });
+
+            // --- UI Helpers ---
+            const setLoading = (isLoading) => {
+                state.isLoading = isLoading;
+                selectors.searchSpinner.style.display = isLoading ? 'block' : 'none';
+            };
+
+            const showNotification = (message, type = 'success') => {
+                selectors.notificationMessage.textContent = message;
+                selectors.notification.className = `notification notification-${type}`;
+                selectors.notificationIcon.innerHTML = type === 'success' ? '<i class="fas fa-check"></i>' : '<i class="fas fa-times"></i>';
+                selectors.notification.classList.add('show');
+                setTimeout(() => selectors.notification.classList.remove('show'), 3000);
+            };
+
+            const showConfirmation = (title, message, confirmClass, onConfirm) => {
+                selectors.dialogTitle.textContent = title;
+                selectors.dialogMessage.textContent = message;
+                selectors.confirmActionBtn.className = `btn ${confirmClass}`;
+                selectors.confirmationDialog.classList.add('open');
+                selectors.overlay.classList.add('show');
+                selectors.confirmActionBtn.onclick = () => {
+                    onConfirm().catch(err => console.error('Confirmation action failed:', err));
+                    hideConfirmation();
+                };
+            };
+
+            const hideConfirmation = () => {
+                selectors.confirmationDialog.classList.remove('open');
+                selectors.overlay.classList.remove('show');
+            };
+
+            selectors.cancelActionBtn.addEventListener('click', hideConfirmation);
+            selectors.overlay.addEventListener('click', hideConfirmation);
+
+            // --- INITIALIZATION ---
+            const checkBackendStatus = async () => {
+                try {
+                    const response = await fetch(`${API_BASE_URL}/status`);
+                    const data = await response.json();
+
+                    if (data.status === 'ready') {
+                        selectors.loadingOverlay.classList.add('hidden');
+                        selectors.appContainer.classList.remove('loading');
+                        showNotification('服务程序加载完成.', 'success');
+                        
+                        const currentTheme = localStorage.getItem('theme') || 'light';
+                        document.documentElement.setAttribute('data-theme', currentTheme);
+                        updateThemeToggle(currentTheme);
+                        loadSpaces();
+                        setInterval(loadSpaces, 15000); // Periodically refresh space status
+                        setInterval(updateGlobalIndexerStatus, 5000); // Poll global indexer status every 5s
+                    } else if (data.status === 'error') {
+                        const formattedMessage = data.message.replace(/\n/g, '<br>');
+                        selectors.loadingOverlay.querySelector('span').innerHTML = `后端错误: <br>${formattedMessage}`;
+                    } else {
+                        selectors.loadingOverlay.querySelector('span').textContent = `🕙 ${data.message}`;
+                        setTimeout(checkBackendStatus, 1000);
+                    }
+                } catch (error) {
+                    selectors.loadingOverlay.querySelector('span').textContent = '无法连接到后端服务，正在重试...';
+                    console.log("Backend not ready, retrying in 2 seconds...");
+                    setTimeout(checkBackendStatus, 2000);
+                }
+            };
+
+            const updateGlobalIndexerStatus = async () => {
+                try {
+                    const status = await api.get('/indexer/status');
+                    const queueSize = status.queue_size || 0;
+                    const threads = status.active_threads || 0;
+                    selectors.indexerStatus.textContent = `任务池: ${queueSize} | 线程数: ${threads}`;
+                } catch (error) {
+                    console.error("Failed to fetch indexer status:", error);
+                    selectors.indexerStatus.textContent = "状态未知";
+                }
+            };
+
+            const init = () => {
+                selectors.appContainer.classList.add('loading');
+                selectors.loadingOverlay.querySelector('span').textContent = '🕙服务程序正在加载...';
+                checkBackendStatus();
+
+                selectors.themeToggleBtn.addEventListener('click', () => {
+                    let theme = document.documentElement.getAttribute('data-theme');
+                    const newTheme = theme === 'light' ? 'dark' : 'light';
+                    document.documentElement.setAttribute('data-theme', newTheme);
+                    localStorage.setItem('theme', newTheme);
+                    updateThemeToggle(newTheme);
+                });
+            };
+            
+            function updateThemeToggle(theme) {
+                if (theme === 'dark') {
+                    selectors.themeToggleBtn.querySelector('i').classList.replace('fa-sun', 'fa-moon');
+                    selectors.themeToggleText.textContent = '亮色模式';
+                } else {
+                    selectors.themeToggleBtn.querySelector('i').classList.replace('fa-moon', 'fa-sun');
+                    selectors.themeToggleText.textContent = '暗色模式';
+                }
+            }
+
+            selectors.aiAssistantBtn.addEventListener('click', () => {
+                showNotification('功能正在开发中,敬请期待.', 'info');
+            });
+
+            init();
+        });
+    </script>
+</body>
+</html>

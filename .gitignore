@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.venv/
+env/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# Node.js / Electron
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnp/
+.pnp.js
+
+# Build artifacts
+build/
+dist/
+*.log
+*.tmp
+*.swp
+*.swo
+
+# Database / Cache
+chroma_db/
+
+# macOS
+.DS_Store

@@ -1,0 +1,80 @@
+{
+  "name": "semantic-file-search",
+  "version": "1.0.0",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "A desktop application for semantic file search.",
+  "devDependencies": {
+    "electron": "37.1.0",
+    "electron-builder": "^26.0.12",
+    "tree-kill": "^1.2.2"
+  },
+  "build": {
+    "appId": "com.yourcompany.semanticfilesearch",
+    "productName": "SemanticFileSearch",
+    "files": [
+      "main.js",
+      "public/**/*"
+    ],
+    "directories": {
+      "output": "build"
+    },
+    "extraResources": [
+      {
+        "from": "../main.py",
+        "to": "main.py"
+      },
+      {
+        "from": "../backend",
+        "to": "backend",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "../.venv",
+        "to": ".venv",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "../start_backend.sh",
+        "to": "start_backend.sh"
+      },
+      {
+        "from": "../requirements.txt",
+        "to": "requirements.txt"
+      },
+      {
+        "from": "../file_search.db",
+        "to": "file_search.db"
+      },
+      {
+        "from": "../chroma_db",
+        "to": "chroma_db",
+        "filter": ["**/*"]
+      }
+    ],
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["arm64", "x64"]
+        }
+      ],
+      "icon": "public/icon.png"
+    },
+    
+    "win": {
+      "target": "nsis",
+      "icon": "public/icon.ico"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "public/icon.png"
+    }
+  }
+}
