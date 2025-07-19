@@ -36,6 +36,26 @@ class ThreadSafeModel:
 # 全局线程安全模型实例
 thread_safe_model = ThreadSafeModel()
 
+# 全局线程池管理器
+_global_executor = None
+_global_executor_lock = threading.Lock()
+
+def get_global_executor(max_workers):
+    """获取全局线程池执行器"""
+    global _global_executor
+    with _global_executor_lock:
+        if _global_executor is None or _global_executor._shutdown:
+            _global_executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix='IndexerWorker')
+        return _global_executor
+
+def shutdown_global_executor(wait=True):
+    """关闭全局线程池执行器"""
+    global _global_executor
+    with _global_executor_lock:
+        if _global_executor is not None and not _global_executor._shutdown:
+            _global_executor.shutdown(wait=wait)
+            _global_executor = None
+
 def get_text_from_file(file_path: str) -> str:
     """Extracts text content from a file based on its extension."""
     _, extension = os.path.splitext(file_path)
@@ -150,32 +170,47 @@ def process_file_task(file_info, space_id):
             return file_path, None, "embedding_failed", "failed"
         
         if file_info["action"] == "insert":
-            file_id = db_manager.execute_write(
-                "INSERT INTO files (path, last_modified, size, md5, space_id) VALUES (?, ?, ?, ?, ?)",
-                (file_path, file_info["last_modified"], file_info["size"], file_info["md5"], space_id)
-            )
+            db_manager.increment_write_queue(1)
+            try:
+                file_id = db_manager.execute_write(
+                    "INSERT INTO files (path, last_modified, size, md5, space_id) VALUES (?, ?, ?, ?, ?)",
+                    (file_path, file_info["last_modified"], file_info["size"], file_info["md5"], space_id)
+                )
+            finally:
+                db_manager.decrement_write_queue(1)
         elif file_info["action"] == "update":
             file_id = file_info["file_id"]
-            db_manager.execute_write("DELETE FROM chunks WHERE file_id = ?", (file_id,))
+            db_manager.increment_write_queue(1)
+            try:
+                db_manager.execute_write("DELETE FROM chunks WHERE file_id = ?", (file_id,))
+            finally:
+                db_manager.decrement_write_queue(1)
         
         if file_id:
-            # 批量插入chunk，减少数据库操作
-            chunk_data = []
-            for i, chunk_text_content in enumerate(chunks):
-                if i < len(embeddings):  # 确保索引不越界
-                    # 限制嵌入向量大小，避免内存问题
-                    embedding = embeddings[i].astype(np.float32)
-                    if len(embedding) > 512:  # 限制向量维度
-                        embedding = embedding[:512]
-                    embedding_bytes = embedding.tobytes()
-                    chunk_data.append((file_id, chunk_text_content, embedding_bytes))
+            # 增加写入队列计数
+            db_manager.increment_write_queue(len(chunks))
             
-            if chunk_data:
-                for chunk in chunk_data:
-                    db_manager.execute_write(
-                        "INSERT INTO chunks (file_id, chunk_text, embedding) VALUES (?, ?, ?)",
-                        chunk
-                    )
+            try:
+                # 批量插入chunk，减少数据库操作
+                chunk_data = []
+                for i, chunk_text_content in enumerate(chunks):
+                    if i < len(embeddings):  # 确保索引不越界
+                        # 限制嵌入向量大小，避免内存问题
+                        embedding = embeddings[i].astype(np.float32)
+                        if len(embedding) > 512:  # 限制向量维度
+                            embedding = embedding[:512]
+                        embedding_bytes = embedding.tobytes()
+                        chunk_data.append((file_id, chunk_text_content, embedding_bytes))
+                
+                if chunk_data:
+                    for chunk in chunk_data:
+                        db_manager.execute_write(
+                            "INSERT INTO chunks (file_id, chunk_text, embedding) VALUES (?, ?, ?)",
+                            chunk
+                        )
+            finally:
+                # 减少写入队列计数
+                db_manager.decrement_write_queue(len(chunks))
         else:
             return file_path, None, "no_file_id", "failed"
 
@@ -236,6 +271,7 @@ def run_indexing_task(space_id: int):
     """使用线程池的版本，避免多进程问题"""
     try:
         db_manager.start()
+        db_manager.reset_write_queue()  # 重置写入队列计数器
         db_manager.execute_write("UPDATE spaces SET status = ?, scanned_files_count = 0, total_files_to_process = 0, processed_files_count = 0, failed_files_count = 0 WHERE id = ?", ('scanning', space_id))
         
         paths = db_manager.execute_read("SELECT path FROM space_paths WHERE space_id = ?", (space_id,))
@@ -260,36 +296,50 @@ def run_indexing_task(space_id: int):
         import backend.state as state_module
         state_module.indexer_state.active_threads = max_workers
         
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            try:
-                # 创建任务
-                futures = {executor.submit(process_file_task, file_info, space_id): file_info 
-                          for file_info in files_to_process}
+        executor = get_global_executor(max_workers)
+        try:
+            # 创建任务
+            futures = {executor.submit(process_file_task, file_info, space_id): file_info 
+                      for file_info in files_to_process}
                 
-                # 处理任务结果
-                completed = 0
-                total = len(futures)
-                
-                for future in as_completed(futures, timeout=3600):  # 1小时超时
-                    file_info = futures[future]
-                    file_path = file_info['path']
-                    try:
-                        file_path_result, chunks_count, error, status = future.result(timeout=300)
-                        if status == "success":
-                            logger.info(f"Successfully processed {file_path_result} ({completed+1}/{total}) with {chunks_count} chunks")
-                        else:
-                            logger.error(f"Failed to process {file_path}: {status} - {error}")
-                            db_manager.execute_write("UPDATE spaces SET failed_files_count = failed_files_count + 1 WHERE id = ?", (space_id,))
-                    except Exception as e:
-                        logger.error(f"A future failed for file {file_path}: {e}")
-                        db_manager.execute_write("UPDATE spaces SET failed_files_count = failed_files_count + 1 WHERE id = ?", (space_id,))
-                    finally:
-                        completed += 1
-                        db_manager.execute_write("UPDATE spaces SET processed_files_count = processed_files_count + 1 WHERE id = ?", (space_id,))
+            # 处理任务结果
+            completed = 0
+            total = len(futures)
             
-            finally:
-                # 重置线程计数
-                state_module.indexer_state.active_threads = 0
+            for future in as_completed(futures, timeout=1800):  # 30分钟超时，减少长时间占用
+                if threading.current_thread().name.startswith('MainThread') and not threading.main_thread().is_alive():
+                    logger.warning("Main thread is dead, cancelling remaining tasks")
+                    break
+                    
+                file_info = futures[future]
+                file_path = file_info['path']
+                try:
+                    file_path_result, chunks_count, error, status = future.result(timeout=60)  # 减少单个文件超时
+                    if status == "success":
+                        logger.info(f"Successfully processed {file_path_result} ({completed+1}/{total}) with {chunks_count} chunks")
+                    else:
+                        logger.error(f"Failed to process {file_path}: {status} - {error}")
+                        db_manager.execute_write("UPDATE spaces SET failed_files_count = failed_files_count + 1 WHERE id = ?", (space_id,))
+                except Exception as e:
+                    logger.error(f"A future failed for file {file_path}: {e}")
+                    db_manager.execute_write("UPDATE spaces SET failed_files_count = failed_files_count + 1 WHERE id = ?", (space_id,))
+                finally:
+                    completed += 1
+                    db_manager.execute_write("UPDATE spaces SET processed_files_count = processed_files_count + 1 WHERE id = ?", (space_id,))
+        except KeyboardInterrupt:
+            logger.info("Indexing interrupted by user")
+            # 取消所有未完成的任务
+            for future in futures:
+                future.cancel()
+            raise
+        except Exception as e:
+            logger.error(f"Indexing task error: {e}")
+            # 取消所有未完成的任务
+            for future in futures:
+                future.cancel()
+        finally:
+            # 重置线程计数
+            state_module.indexer_state.active_threads = 0
 
         build_faiss_index(space_id)
 

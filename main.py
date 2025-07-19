@@ -565,10 +565,44 @@ def on_shutdown():
             except Exception as e:
                 logger.error(f"Error stopping executor: {e}")
     
+    # 关闭全局线程池
+    try:
+        from backend import indexer_thread
+        indexer_thread.shutdown_global_executor(wait=True)
+        logger.info("Global ThreadPoolExecutor shutdown complete")
+    except Exception as e:
+        logger.error(f"Error shutting down global ThreadPoolExecutor: {e}")
+    
     # Then, stop the database manager
     logger.info("Stopping database manager.")
     db_manager.stop()
     logger.info("Shutdown complete.")
+
+# 导入进程管理器
+from backend.process_manager import process_manager, ensure_cleanup
+
+# 确保清理函数被注册
+ensure_cleanup()
+
+# 添加更强的信号处理
+import signal
+
+def signal_handler(signum, _frame):
+    """处理中断信号"""
+    logger.info(f"Received signal {signum}, initiating graceful shutdown...")
+    
+    try:
+        # 使用进程管理器进行清理
+        process_manager._graceful_shutdown(signum, _frame)
+    except Exception as e:
+        logger.error(f"Error in signal handler: {e}")
+        # 强制退出
+        import os
+        os._exit(1)
+
+# 注册信号处理
+signal.signal(signal.SIGINT, signal_handler)
+signal.signal(signal.SIGTERM, signal_handler)
 
 if __name__ == "__main__":
     uvicorn.run(

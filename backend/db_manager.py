@@ -13,6 +13,8 @@ class DatabaseManager:
         self._local = threading.local()
         self._pid = os.getpid()
         self._lock = threading.Lock()
+        self._write_queue_count = 0
+        self._write_queue_lock = threading.Lock()
 
     def _get_connection(self):
         """
@@ -79,13 +81,24 @@ class DatabaseManager:
             raise e
     
     def get_queue_size(self):
-        """Returns the number of items in the indexing queue."""
-        try:
-            result = self.execute_read("SELECT count(*) FROM files;")
-            return result[0][0] if result else 0
-        except Exception as e:
-            logger.error(f"Error getting queue size: {e}")
-            return 0
+        """Returns the number of items in the database write queue."""
+        with self._write_queue_lock:
+            return self._write_queue_count
+    
+    def increment_write_queue(self, count=1):
+        """Increments the database write queue counter."""
+        with self._write_queue_lock:
+            self._write_queue_count += count
+    
+    def decrement_write_queue(self, count=1):
+        """Decrements the database write queue counter."""
+        with self._write_queue_lock:
+            self._write_queue_count = max(0, self._write_queue_count - count)
+    
+    def reset_write_queue(self):
+        """Resets the database write queue counter to zero."""
+        with self._write_queue_lock:
+            self._write_queue_count = 0
 
     def create_tables(self):
         """Creates or updates the necessary database tables."""
