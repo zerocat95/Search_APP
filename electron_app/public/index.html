@@ -191,6 +191,9 @@
         .open-file-btn { background: none; border: none; color: var(--macos-gray); font-size: 14px; margin-right: 8px; cursor: pointer; padding: 4px; border-radius: 4px; transition: background 0.2s; }
         .open-file-btn:hover { background: var(--macos-hover-bg); }
         .empty-state { text-align: center; padding: 50px; color: var(--macos-gray); }
+        .loading-state { text-align: center; padding: 50px; color: var(--macos-blue); }
+        .loading-state i { font-size: 24px; margin-bottom: 10px; display: block; }
+        .ready-state { text-align: center; padding: 50px; color: var(--macos-green); }
         .highlight { background-color: rgba(255, 204, 0, 0.4); padding: 0 2px; border-radius: 3px; }
 
         /* --- Settings Panel --- */
@@ -466,6 +469,7 @@
             // --- CONFIG & STATE ---
             let backendIp = '127.0.0.1'; // Default fallback
             let backendPort = 8233; // Default fallback
+            let API_BASE_URL = `http://${backendIp}:${backendPort}/api`;
             let state = {
                 spaces: [],
                 activeSpaceId: 'all',
@@ -545,6 +549,8 @@
                 patch(endpoint, body) { return this.request('PATCH', endpoint, body); },
                 delete(endpoint) { return this.request('DELETE', endpoint); },
             };
+
+            // MODEL STATUS CHECKING IS NOW HANDLED BY checkBackendStatus
 
             // --- ETA & FORMATTING ---
             function formatEta(milliseconds) {
@@ -726,9 +732,13 @@
             };
 
             const handleSearch = async () => {
+                if (selectors.searchInput.disabled) {
+                    showNotification('搜索功能暂不可用：服务尚未就绪。', 'error');
+                    return;
+                }
                 if (!state.searchQuery) {
                     selectors.resultsContainer.innerHTML = '<div class="empty-state">您的搜索结果将显示在这里</div>';
-                    selectors.resultsInfo.textContent = '欢迎！选择一个空间并开始搜索.';
+                    selectors.resultsInfo.textContent = '✅ 模型已就绪，可以开始搜索';
                     return;
                 }
                 setLoading(true);
@@ -760,14 +770,19 @@
                     }
                 } catch (error) { 
                     console.error('Search failed:', error); 
+                    selectors.resultsInfo.textContent = `搜索失败: ${error.message}`;
                 }
                 finally { setLoading(false); }
             };
 
             const handleFilenameSearch = async () => {
+                if (selectors.searchInput.disabled) {
+                    showNotification('搜索功能暂不可用：服务尚未就绪。', 'error');
+                    return;
+                }
                 if (!state.searchQuery) {
                     selectors.resultsContainer.innerHTML = '<div class="empty-state">您的搜索结果将显示在这里</div>';
-                    selectors.resultsInfo.textContent = '欢迎！选择一个空间并开始搜索.';
+                    selectors.resultsInfo.textContent = '✅ 模型已就绪，可以开始搜索';
                     return;
                 }
                 setLoading(true);
@@ -795,6 +810,7 @@
                     }
                 } catch (error) { 
                     console.error('Filename search failed:', error); 
+                    selectors.resultsInfo.textContent = `文件名搜索失败: ${error.message}`;
                 }
                 finally { setLoading(false); }
             };
@@ -1098,13 +1114,21 @@
                 try {
                     const response = await fetch(`${API_BASE_URL}/status`);
                     const data = await response.json();
+                    const searchInput = selectors.searchInput;
+                    const resultsInfo = selectors.resultsInfo;
 
                     if (data.status === 'ready') {
+                        // Stop polling, show success, and initialize the app fully.
                         selectors.loadingOverlay.classList.add('hidden');
                         selectors.appContainer.classList.remove('loading');
                         showNotification('服务程序加载完成.', 'success');
-                        
-                        // Get app version after backend is ready
+
+                        // Update UI based on ready state
+                        searchInput.placeholder = '搜索文档...';
+                        resultsInfo.textContent = '✅ 服务已就绪，可以开始搜索';
+                        searchInput.disabled = false;
+
+                        // Final initializations
                         const appConfig = await api.get('/app-config');
                         document.getElementById('version-info').textContent = `Vers:${appConfig.version}`;
 
@@ -1112,27 +1136,42 @@
                         document.documentElement.setAttribute('data-theme', currentTheme);
                         updateThemeToggle(currentTheme);
                         loadSpaces();
-                        setInterval(loadSpaces, 15000); // Periodically refresh space status
-                        setInterval(updateGlobalIndexerStatus, 5000); // Poll global indexer status every 5s
+                        setInterval(loadSpaces, 15000);
+                        setInterval(updateGlobalIndexerStatus, 5000);
+
                     } else if (data.status === 'error') {
+                        // Backend reported an error, display it and stop polling.
                         const formattedMessage = data.message.replace(/\n/g, '<br>');
                         selectors.loadingOverlay.querySelector('span').innerHTML = `后端错误: <br>${formattedMessage}`;
-                    } else {
+                        
+                        // Update UI based on error state
+                        searchInput.placeholder = '服务加载失败，请重试...';
+                        resultsInfo.textContent = `❌ ${data.message}`;
+                        searchInput.disabled = true;
+
+                    } else { // status is 'loading'
+                        // Backend is still loading, update message and poll again.
                         selectors.loadingOverlay.querySelector('span').textContent = `🕙 ${data.message}`;
+                        
+                        // Update UI based on loading state
+                        searchInput.placeholder = '服务加载中，请稍候...';
+                        resultsInfo.textContent = `📦 ${data.message}`;
+                        searchInput.disabled = true;
+                        
                         setTimeout(checkBackendStatus, 1000);
                     }
                 } catch (error) {
                     const elapsedTime = Date.now() - backendConnectionAttemptStartTime;
                     let message = '';
-                    let retryDelay = 1000; // Default retry every 1 second
+                    let retryDelay = 1000;
 
-                    if (elapsedTime < 10000) { // First 10 seconds
+                    if (elapsedTime < 10000) {
                         message = '等待程序初始化完成...';
                         retryDelay = 1000;
-                    } else if (elapsedTime < 20000) { // 10 to 20 seconds
+                    } else if (elapsedTime < 20000) {
                         message = '无法连接到后端服务,正在重试...';
                         retryDelay = 2000;
-                    } else { // After 20 seconds
+                    } else {
                         message = '后端服务未能正常工作,请尝试退出程序重新开启.';
                         retryDelay = 2000;
                     }
@@ -1158,10 +1197,9 @@
                 selectors.appContainer.classList.add('loading');
                 selectors.loadingOverlay.querySelector('span').textContent = '🕙服务程序正在加载...';
 
-                let configData;
                 try {
                     if (window.electronAPI && typeof window.electronAPI.getBackendConfig === 'function') {
-                        configData = await window.electronAPI.getBackendConfig();
+                        const configData = await window.electronAPI.getBackendConfig();
                         backendIp = configData.listenIp;
                         backendPort = configData.listenPort;
                         API_BASE_URL = `http://${backendIp}:${backendPort}/api`;

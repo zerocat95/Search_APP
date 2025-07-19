@@ -19,5 +19,12 @@ LISTEN_PORT=$(grep -E '^LISTEN_PORT\s*=' "$CONFIG_FILE" | cut -d '=' -f2 | tr -d
 # Kill any process using the configured port
 lsof -ti:"$LISTEN_PORT" | xargs kill -9
 
+# Set environment variables to prevent OpenMP and macOS-specific issues
+export KMP_DUPLICATE_LIB_OK=TRUE
+export OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES
+export OMP_NUM_THREADS=1  # Force single-threaded OpenMP to prevent crashes
+export MKL_NUM_THREADS=1  # Limit MKL threads
+export OPENBLAS_NUM_THREADS=1  # Limit OpenBLAS threads
+
 # Start the FastAPI server
 uvicorn main:app --host "$LISTEN_IP" --port "$LISTEN_PORT"

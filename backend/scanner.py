@@ -27,8 +27,9 @@ def scan_directories(directories: list[str], space_id: int, ignored_dirs: list[s
 
     files_to_process = []
     scanned_count = 0
-
-    db_manager.execute_write("UPDATE spaces SET scanned_files_count = 0 WHERE id = ?", (space_id,))
+    
+    # 批量更新扫描计数，避免频繁数据库操作
+    update_interval = 50  # 每50个文件更新一次
 
     for directory in directories:
         for root, dirs, files in os.walk(directory):
@@ -48,15 +49,20 @@ def scan_directories(directories: list[str], space_id: int, ignored_dirs: list[s
                         continue
 
                     scanned_count += 1
-                    db_manager.execute_write("UPDATE spaces SET scanned_files_count = ? WHERE id = ?", (scanned_count, space_id))
+                    # 批量更新，减少数据库操作
+                    if scanned_count % update_interval == 0:
+                        db_manager.execute_write("UPDATE spaces SET scanned_files_count = ? WHERE id = ?", (scanned_count, space_id))
 
                     # Check if file exists in DB and if it needs updating
-                    result = db_manager.execute_read("SELECT id, last_modified, md5, content FROM files WHERE path = ? AND space_id = ?", (file_path, space_id))
+                    result = db_manager.execute_read("SELECT id, last_modified, md5 FROM files WHERE path = ? AND space_id = ?", (file_path, space_id))
 
                     if result:
-                        file_id, db_last_modified, db_md5, db_content = result[0]
-                        # Condition to re-index: modified file OR content field is empty/null
-                        if db_last_modified != last_modified or db_md5 != md5 or not db_content:
+                        file_id, db_last_modified, db_md5 = result[0]
+                        # Check if the file has any chunks associated with it
+                        chunk_exists = db_manager.execute_read("SELECT 1 FROM chunks WHERE file_id = ? LIMIT 1", (file_id,))
+                        
+                        # Condition to re-index: modified file OR no chunks exist for it
+                        if db_last_modified != last_modified or db_md5 != md5 or not chunk_exists:
                             files_to_process.append({
                                 "file_id": file_id,
                                 "path": file_path,
@@ -79,4 +85,8 @@ def scan_directories(directories: list[str], space_id: int, ignored_dirs: list[s
                 except (FileNotFoundError, PermissionError) as e:
                     print(f"Error accessing {file_path}: {e}")
 
+    # 最后更新一次扫描计数
+    if scanned_count % update_interval != 0:  # 如果还有未更新的计数
+        db_manager.execute_write("UPDATE spaces SET scanned_files_count = ? WHERE id = ?", (scanned_count, space_id))
+    
     return files_to_process

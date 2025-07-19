@@ -46,47 +46,50 @@ def init_db():
         size INTEGER NOT NULL,
         md5 TEXT NOT NULL,
         space_id INTEGER NOT NULL,
-        content TEXT,  -- Store pre-tokenized content for FTS
-        original_content TEXT, -- Store original content for display
         FOREIGN KEY (space_id) REFERENCES spaces (id) ON DELETE CASCADE
     );
     """)
     cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_path_space_id ON files (path, space_id);")
 
-    # Create FTS5 virtual table using a standard tokenizer
+    # Create chunks table for text and embeddings
     cursor.execute("""
-    CREATE VIRTUAL TABLE IF NOT EXISTS files_fts USING fts5(
-        path,
-        content,
-        content='files',
-        content_rowid='id',
-        tokenize = 'unicode61 remove_diacritics 0' -- A robust, standard tokenizer
+    CREATE TABLE IF NOT EXISTS chunks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        file_id INTEGER NOT NULL,
+        chunk_text TEXT NOT NULL,
+        embedding BLOB NOT NULL,
+        FOREIGN KEY (file_id) REFERENCES files (id) ON DELETE CASCADE
     );
     """)
 
-    # Triggers to keep FTS table synchronized
+    # Create FTS5 table for keyword search on chunks
     cursor.execute("""
-    CREATE TRIGGER IF NOT EXISTS files_after_insert
-    AFTER INSERT ON files
-    BEGIN
-        INSERT INTO files_fts(rowid, path, content) VALUES (new.id, new.path, new.content);
-    END;
-    """)
+    CREATE VIRTUAL TABLE IF NOT EXISTS chunks_fts USING fts5(
+        chunk_text,
+        content='chunks',
+        content_rowid='id'
+    );
+    """);
+
+    # Triggers to keep FTS table in sync
     cursor.execute("""
-    CREATE TRIGGER IF NOT EXISTS files_after_delete
-    AFTER DELETE ON files
+    CREATE TRIGGER IF NOT EXISTS chunks_after_insert AFTER INSERT ON chunks
     BEGIN
-        INSERT INTO files_fts(files_fts, rowid, path, content) VALUES ('delete', old.id, old.path, old.content);
+        INSERT INTO chunks_fts(rowid, chunk_text) VALUES (new.id, new.chunk_text);
     END;
-    """)
+    """);
     cursor.execute("""
-    CREATE TRIGGER IF NOT EXISTS files_after_update
-    AFTER UPDATE ON files
+    CREATE TRIGGER IF NOT EXISTS chunks_after_delete AFTER DELETE ON chunks
     BEGIN
-        INSERT INTO files_fts(files_fts, rowid, path, content) VALUES ('delete', old.id, old.path, old.content);
-        INSERT INTO files_fts(rowid, path, content) VALUES (new.id, new.path, new.content);
+        DELETE FROM chunks_fts WHERE rowid=old.id;
     END;
-    """)
+    """);
+    cursor.execute("""
+    CREATE TRIGGER IF NOT EXISTS chunks_after_update AFTER UPDATE ON chunks
+    BEGIN
+        UPDATE chunks_fts SET chunk_text = new.chunk_text WHERE rowid=old.id;
+    END;
+    """);
 
     conn.commit()
     conn.close()

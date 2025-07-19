@@ -1,10 +1,18 @@
+import os
+import sys
+
+# IMPORTANT: Set these environment variables BEFORE any other imports
+# to prevent crashes on macOS with multiple OpenMP libraries.
+os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
+os.environ['OMP_NUM_THREADS'] = '1'  # Force single-threaded OpenMP to prevent crashes
+os.environ['MKL_NUM_THREADS'] = '1'  # Limit MKL threads
+os.environ['OPENBLAS_NUM_THREADS'] = '1'  # Limit OpenBLAS threads
+
 import uvicorn
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import sqlite3
-import os
-import sys
 import datetime
 import asyncio
 from typing import List, Optional
@@ -157,9 +165,29 @@ async def initialize_backend():
 
         await asyncio.sleep(0.1)
 
-        backend_status.update({"status": "loading", "message": "正在加载依赖模块..."})
-        from backend import search, indexer
-        await asyncio.sleep(0.1)
+        backend_status.update({"status": "loading", "message": "正在加载模型..."})
+        from backend import search
+        # 使用线程池版本替代多进程版本
+        from backend import indexer_thread as indexer
+        
+        # 设置Faiss线程数限制，避免过多线程导致段错误
+        try:
+            import faiss
+            # 在macOS上强制使用单线程以避免段错误
+            import platform
+            if platform.system() == 'Darwin':
+                faiss.omp_set_num_threads(1)
+            else:
+                faiss.omp_set_num_threads(min(4, (os.cpu_count() or 1)))
+        except Exception as e:
+            logger.warning(f"Failed to set Faiss thread count: {e}")
+        
+        # 预加载模型，避免首次搜索延迟
+        try:
+            search.get_model()
+            logger.info("模型预加载完成")
+        except Exception as e:
+            logger.warning(f"模型预加载失败: {e}")
 
         search_service = search
         indexer_service = indexer
@@ -393,8 +421,62 @@ async def search(q: str, space_id: int = None, limit: int = 10):
     check_backend_ready()
     if not q:
         raise HTTPException(status_code=422, detail="Query parameter 'q' cannot be empty.")
+    logger.info(f"Searching for: '{q}' in space {space_id}")
     results = search_service.search(query=q, space_id=space_id, limit=limit)
+    logger.info(f"Search returned {len(results)} results")
     return results
+
+@app.get("/api/search/debug", tags=["Search"])
+async def search_debug(q: str, space_id: int = None):
+    """Debug endpoint to provide detailed search information"""
+    check_backend_ready()
+    if not q:
+        return {"error": "Query parameter 'q' cannot be empty."}
+    
+    # Get space information
+    if space_id:
+        spaces = [{"id": space_id}]
+    else:
+        spaces = db_manager.execute_read("SELECT id, name FROM spaces")
+    
+    debug_info = {
+        "query": q,
+        "spaces_checked": [],
+        "total_results": 0,
+        "indexed_files_count": 0
+    }
+    
+    for space in spaces:
+        space_id_check = space["id"]
+        space_name = space.get("name", f"Space {space_id_check}")
+        
+        # Check if index exists
+        index_path = os.path.join(os.path.dirname(config.get('DB_PATH')), f"space_{space_id_check}.faiss_index")
+        index_exists = os.path.exists(index_path)
+        
+        # Count indexed files
+        file_count = db_manager.execute_read(
+            "SELECT COUNT(*) FROM files WHERE space_id = ?", 
+            (space_id_check,)
+        )[0][0]
+        
+        # Count indexed chunks
+        chunk_count = db_manager.execute_read(
+            "SELECT COUNT(*) FROM chunks c JOIN files f ON c.file_id = f.id WHERE f.space_id = ?", 
+            (space_id_check,)
+        )[0][0]
+        
+        debug_info["spaces_checked"].append({
+            "space_id": space_id_check,
+            "name": space_name,
+            "index_exists": index_exists,
+            "indexed_files": file_count,
+            "indexed_chunks": chunk_count
+        })
+        
+        debug_info["indexed_files_count"] += file_count
+    
+    return debug_info
 
 @app.get("/api/search/filenames", response_model=List[File], tags=["Search"])
 async def search_filenames(q: str, space_id: int = None, limit: int = 20):
@@ -444,12 +526,44 @@ async def on_startup():
 def on_shutdown():
     logger.info("Application is shutting down. Stopping all background services.")
     
+    # 清理所有子进程
+    logger.info("Cleaning up all child processes...")
+    try:
+        import psutil
+        current_process = psutil.Process()
+        children = current_process.children(recursive=True)
+        
+        logger.info(f"Found {len(children)} child processes to terminate")
+        for child in children:
+            try:
+                logger.info(f"Terminating child process {child.pid}")
+                child.terminate()
+                try:
+                    child.wait(timeout=5)
+                except psutil.TimeoutExpired:
+                    logger.warning(f"Force killing process {child.pid}")
+                    child.kill()
+                    # 再次确认进程已终止
+                    try:
+                        child.wait(timeout=2)
+                    except psutil.TimeoutExpired:
+                        logger.error(f"Failed to kill process {child.pid}")
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
+            except Exception as e:
+                logger.error(f"Error terminating process {child.pid}: {e}")
+    except ImportError:
+        logger.warning("psutil not available, skipping child process cleanup")
+    
     # Stop all active indexer executors first
     with indexer_state.lock:
         active_executors = list(indexer_state.active_executors)
         logger.info(f"Found {len(active_executors)} active indexer(s) to shut down.")
         for executor in active_executors:
-            executor.stop()
+            try:
+                executor.stop()
+            except Exception as e:
+                logger.error(f"Error stopping executor: {e}")
     
     # Then, stop the database manager
     logger.info("Stopping database manager.")

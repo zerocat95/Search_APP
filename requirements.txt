@@ -11,5 +11,8 @@ fastapi
 uvicorn[standard]
 pydantic
 jieba
+jieba_fast
 sentence-transformers
 transformers
+faiss-cpu
+numpy
