@@ -49,7 +49,7 @@ function readConfig() {
   }
 }
 
-function createWindow(listenIp, listenPort) {
+function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1000,
     height: 800,
@@ -63,15 +63,11 @@ function createWindow(listenIp, listenPort) {
   // Load the index.html of the app with a cache-busting parameter.
   mainWindow.loadFile(path.join(__dirname, 'public', 'index.html'), { query: { v: Date.now() } });
 
-  // IPC Handler to send backend config to renderer
-  ipcMain.handle('get-backend-config', () => {
-    return { listenIp, listenPort };
-  });
-
   // Start polling for indexer status
+  const config = readConfig();
   setInterval(() => {
     if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('get-indexer-status', { listenIp, listenPort });
+      mainWindow.webContents.send('get-indexer-status', { listenIp: config.listenIp, listenPort: config.listenPort });
     }
   }, 5000); // 5 seconds
 
@@ -99,37 +95,40 @@ function startBackend() {
   });
 }
 
-app.whenReady().then(() => {
-  const { listenIp, listenPort } = readConfig();
-  startBackend();
-  createWindow(listenIp, listenPort);
+// IPC Handlers - register only once at app startup
+ipcMain.handle('get-backend-config', () => {
+  return readConfig();
+});
 
-  // IPC Handlers for directory selection and file opening
-  ipcMain.handle('dialog:openDirectory', async () => {
-    const { canceled, filePaths } = await dialog.showOpenDialog({
-      properties: ['openDirectory']
-    });
-    if (canceled) {
-      return null;
+ipcMain.handle('dialog:openDirectory', async () => {
+  const { canceled, filePaths } = await dialog.showOpenDialog({
+    properties: ['openDirectory']
+  });
+  if (canceled) {
+    return null;
+  } else {
+    return filePaths[0];
+  }
+});
+
+ipcMain.on('file:open', (event, filePath) => {
+  shell.openPath(filePath);
+});
+
+ipcMain.on('update-title', (event, { queue_size, active_threads }) => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    const originalTitle = 'File Search App';
+    if (queue_size > 0 || active_threads > 0) {
+      mainWindow.setTitle(`${originalTitle} - 索引中 (队列: ${queue_size}, 线程: ${active_threads})`);
     } else {
-      return filePaths[0];
+      mainWindow.setTitle(originalTitle);
     }
-  });
+  }
+});
 
-  ipcMain.on('file:open', (event, filePath) => {
-    shell.openPath(filePath);
-  });
-
-  ipcMain.on('update-title', (event, { queue_size, active_threads }) => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      const originalTitle = 'File Search App';
-      if (queue_size > 0 || active_threads > 0) {
-        mainWindow.setTitle(`${originalTitle} - 索引中 (队列: ${queue_size}, 线程: ${active_threads})`);
-      } else {
-        mainWindow.setTitle(originalTitle);
-      }
-    }
-  });
+app.whenReady().then(() => {
+  startBackend();
+  createWindow();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
