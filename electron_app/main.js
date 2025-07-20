@@ -141,17 +141,54 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
+  // 在macOS上，窗口关闭但应用仍在运行，确保清理
+  else {
+    console.log('All windows closed on macOS, backend process will continue running');
+  }
+});
+
+// 统一的清理函数
+function cleanupBackendProcess() {
+  console.log('Cleaning up backend process...');
+  if (backendProcess && !backendProcess.killed) {
+    console.log('Sending SIGTERM to backend process...');
+    backendProcess.kill('SIGTERM');
+    
+    // 给后端进程一些时间优雅退出
+    const timeout = setTimeout(() => {
+      if (backendProcess && !backendProcess.killed) {
+        console.log('Backend still running, force killing with SIGKILL...');
+        backendProcess.kill('SIGKILL');
+        
+        // 如果还失败，使用tree-kill
+        setTimeout(() => {
+          if (backendProcess && !backendProcess.killed) {
+            console.log('Using tree-kill to force terminate...');
+            kill(backendProcess.pid, 'SIGKILL');
+          }
+        }, 500);
+      }
+    }, 1500);
+    
+    // 清理timeout避免内存泄漏
+    backendProcess.on('exit', () => {
+      clearTimeout(timeout);
+      console.log('Backend process exited');
+    });
+  }
+}
+
+// 确保所有退出路径都调用清理
+app.on('before-quit', (event) => {
+  console.log('Application is about to quit...');
+  cleanupBackendProcess();
 });
 
 app.on('will-quit', () => {
-  // Kill the backend process and its entire process tree when the Electron app is closing
-  if (backendProcess && backendProcess.pid) {
-    kill(backendProcess.pid, 'SIGKILL', (err) => {
-      if (err) {
-        console.error('Failed to kill backend process tree:', err);
-      } else {
-        console.log('Successfully killed backend process tree.');
-      }
-    });
-  }
+  console.log('Application will quit...');
+  cleanupBackendProcess();
+});
+
+app.on('quit', () => {
+  console.log('Application quit complete');
 });
