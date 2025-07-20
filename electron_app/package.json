@@ -24,8 +24,7 @@
       "main.js",
       "preload.js",
       "public/**/*",
-      "!**/.venv/**",
-      "!**/node_modules/**"
+      "!**/.venv/**"
     ],
     "directories": {
       "output": "build"
@@ -43,6 +42,10 @@
       {
         "from": "../start_backend.sh",
         "to": "start_backend.sh"
+      },
+      {
+        "from": "../init_python_env.sh",
+        "to": "init_python_env.sh"
       },
       {
         "from": "../requirements.txt",

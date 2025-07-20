@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>正在加载...</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            background-color: #2e2e2e;
+            color: #f0f0f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            text-align: center;
+            -webkit-app-region: drag;
+        }
+        .container {
+            max-width: 80%;
+        }
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 4px solid #ffffff;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        #status {
+            font-size: 16px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="spinner"></div>
+        <p id="status">正在启动服务...</p>
+        <button id="cancel-btn" style="margin-top: 20px; padding: 8px 16px; background-color: #555; color: white; border: none; border-radius: 5px; cursor: pointer;">取消</button>
+    </div>
+    <script>
+        const statusElement = document.getElementById('status');
+        const cancelBtn = document.getElementById('cancel-btn');
+
+        if (window.electronAPI && window.electronAPI.onInitializationStatus) {
+            window.electronAPI.onInitializationStatus((event, message) => {
+                if (statusElement) {
+                    statusElement.textContent = message;
+                }
+            });
+        }
+
+        cancelBtn.addEventListener('click', () => {
+            if (window.electronAPI && window.electronAPI.cancelInitialization) {
+                window.electronAPI.cancelInitialization();
+            }
+        });
+    </script>
+</body>
+</html>

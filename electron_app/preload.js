@@ -5,6 +5,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openFile: (filePath) => ipcRenderer.send('file:open', filePath),
   relaunchApp: () => ipcRenderer.send('app:relaunch'),
   getBackendConfig: () => ipcRenderer.invoke('get-backend-config'),
+  onInitializationStatus: (callback) => ipcRenderer.on('initialization-status', callback),
+  cancelInitialization: () => ipcRenderer.send('cancel-initialization')
 });
 
 // Listen for status requests from the main process

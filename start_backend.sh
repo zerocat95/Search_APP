@@ -3,17 +3,38 @@
 # 获取脚本所在目录
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
 
-# 设置虚拟环境路径（在用户目录下）
+# --- Python Virtual Environment Setup ---
 VENV_DIR="$HOME/.search_app/.venv"
+REQUIREMENTS_FILE="$SCRIPT_DIR/requirements.txt"
 
-# 检查虚拟环境是否存在
+# Function to check for python3
+check_python3() {
+    if ! command -v python3 &> /dev/null; then
+        echo "INIT_STATUS:ERROR: python3 is not installed. Please install Python 3.8 or higher."
+        exit 1
+    fi
+}
+
+# Check if venv exists, if not, create it and install packages
 if [ ! -d "$VENV_DIR" ]; then
-    echo "错误: Python虚拟环境不存在，请先运行初始化脚本"
-    echo "虚拟环境路径: $VENV_DIR"
-    exit 1
+    echo "INIT_STATUS:正在准备Python虚拟环境,预计3-5分钟就绪..."
+    check_python3
+    python3 -m venv "$VENV_DIR"
+    if [ $? -ne 0 ]; then
+        echo "INIT_STATUS:ERROR: Failed to create Python virtual environment."
+        exit 1
+    fi
+    
+    echo "INIT_STATUS:正在安装依赖包,请稍候..."
+    "$VENV_DIR/bin/pip" install --no-cache-dir -r "$REQUIREMENTS_FILE" -i https://pypi.tuna.tsinghua.edu.cn/simple
+    if [ $? -ne 0 ]; then
+        echo "INIT_STATUS:ERROR: Failed to install dependencies from requirements.txt."
+        exit 1
+    fi
+    echo "INIT_STATUS:Python环境准备就绪!"
 fi
 
-# 激活虚拟环境
+# Activate virtual environment
 source "$VENV_DIR/bin/activate"
 
 # 设置Hugging Face镜像站点
@@ -44,4 +65,7 @@ mkdir -p "$LOG_DIR"
 echo "使用虚拟环境: $VENV_DIR"
 echo "启动FastAPI服务器: http://$LISTEN_IP:$LISTEN_PORT"
 
+# Launch the main Python application
+# Launch the main Python application
+echo "INIT_STATUS:正在加载AI模型,请稍候..."
 exec python "$SCRIPT_DIR/main.py"

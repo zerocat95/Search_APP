@@ -49,126 +49,93 @@ function readConfig() {
   }
 }
 
-function createInitializationWindow() {
-  const initWindow = new BrowserWindow({
-    width: 500,
-    height: 400,
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      nodeIntegration: false,
-      contextIsolation: true,
-    },
-    frame: false,
-    resizable: false,
-    alwaysOnTop: true,
-    center: true,
-  });
+function createLoadingWindow() {
+    const loadingWindow = new BrowserWindow({
+        width: 500,
+        height: 300,
+        frame: true,
+        resizable: true,
+        webPreferences: {
+            preload: path.join(__dirname, 'preload.js'),
+            nodeIntegration: false,
+            contextIsolation: true,
+        },
+        center: true,
+        title: '正在加载...',
+    });
 
-  initWindow.loadFile(path.join(__dirname, 'public', 'initialization.html'));
-  return initWindow;
+    loadingWindow.loadFile(path.join(__dirname, 'public', 'loading.html'));
+    return loadingWindow;
 }
 
 function createMainWindow() {
-  mainWindow = new BrowserWindow({
-    width: 1000,
-    height: 800,
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      nodeIntegration: false,
-      contextIsolation: true,
-    },
-  });
-
-  // Load the index.html of the app with a cache-busting parameter.
-  mainWindow.loadFile(path.join(__dirname, 'public', 'index.html'), { query: { v: Date.now() } });
-
-  // Start polling for indexer status
-  const config = readConfig();
-  setInterval(() => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('get-indexer-status', { listenIp: config.listenIp, listenPort: config.listenPort });
-    }
-  }, 5000); // 5 seconds
-
-  // Open the DevTools.
-  //mainWindow.webContents.openDevTools();
-}
-
-async function checkAndInitializePythonEnv() {
-  const venvPath = path.join(app.getPath('home'), '.search_app', '.venv');
-  const requirementsPath = path.join(app.getAppPath(), '..', 'requirements.txt');
-  const initScriptPath = path.join(app.getAppPath(), '..', 'init_python_env.sh');
-
-  if (!fs.existsSync(venvPath)) {
-    console.log('Python虚拟环境不存在，开始初始化...');
-    
-    // 发送初始化状态给前端
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('env-initialization-start');
-    }
-
-    return new Promise((resolve, reject) => {
-      const initProcess = spawn('/bin/bash', [initScriptPath, requirementsPath], {
-        cwd: path.join(app.getAppPath(), '..')
-      });
-
-      initProcess.stdout.on('data', (data) => {
-        console.log(`Init stdout: ${data}`);
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send('env-initialization-progress', data.toString());
-        }
-      });
-
-      initProcess.stderr.on('data', (data) => {
-        console.error(`Init stderr: ${data}`);
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send('env-initialization-progress', data.toString());
-        }
-      });
-
-      initProcess.on('close', (code) => {
-        if (code === 0) {
-          console.log('Python环境初始化完成');
-          if (mainWindow && !mainWindow.isDestroyed()) {
-            mainWindow.webContents.send('env-initialization-complete');
-          }
-          resolve();
-        } else {
-          console.error(`Python环境初始化失败，退出码: ${code}`);
-          if (mainWindow && !mainWindow.isDestroyed()) {
-            mainWindow.webContents.send('env-initialization-error', `初始化失败，退出码: ${code}`);
-          }
-          reject(new Error(`Python环境初始化失败`));
-        }
-      });
+    mainWindow = new BrowserWindow({
+        width: 1000,
+        height: 800,
+        webPreferences: {
+            preload: path.join(__dirname, 'preload.js'),
+            nodeIntegration: false,
+            contextIsolation: true,
+        },
     });
-  } else {
-    console.log('Python虚拟环境已存在');
-    return Promise.resolve();
-  }
+
+    mainWindow.loadFile(path.join(__dirname, 'public', 'index.html'), { query: { v: Date.now() } });
+
+    const config = readConfig();
+    setInterval(() => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('get-indexer-status', { listenIp: config.listenIp, listenPort: config.listenPort });
+        }
+    }, 5000);
 }
 
-function startBackend() {
-  const venvPath = path.join(app.getPath('home'), '.search_app', '.venv');
-  const scriptPath = path.join(venvPath, 'bin', 'python');
-  const mainPyPath = path.join(app.getAppPath(), '..', 'main.py');
-  
-  // 使用虚拟环境中的Python运行main.py
-  backendProcess = spawn(scriptPath, [mainPyPath], {
-    cwd: path.join(app.getAppPath(), '..')
-  });
+function startBackend(loadingWindow) {
+    const scriptPath = path.join(app.getAppPath(), '..', 'start_backend.sh');
+    
+    backendProcess = spawn('/bin/bash', [scriptPath], {
+        cwd: path.join(app.getAppPath(), '..'),
+        env: { ...process.env, HOME: app.getPath('home') }
+    });
 
-  backendProcess.stdout.on('data', (data) => {
-    console.log(`Backend stdout: ${data}`);
-  });
+    const sendStatus = (message) => {
+        if (loadingWindow && !loadingWindow.isDestroyed()) {
+            loadingWindow.webContents.send('initialization-status', message);
+        }
+    };
 
-  backendProcess.stderr.on('data', (data) => {
-    console.error(`Backend stderr: ${data}`);
-  });
+    backendProcess.stdout.on('data', (data) => {
+        const output = data.toString();
+        console.log(`Backend stdout: ${output}`);
+        if (output.includes('INIT_STATUS:')) {
+            sendStatus(output.replace('INIT_STATUS:', '').trim());
+        }
+        if (output.includes('Backend initialization complete')) {
+            if (loadingWindow && !loadingWindow.isDestroyed()) {
+                loadingWindow.close();
+            }
+            createMainWindow();
+        }
+    });
 
-  backendProcess.on('close', (code) => {
-    console.log(`Backend process exited with code ${code}`);
-  });
+    backendProcess.stderr.on('data', (data) => {
+        const output = data.toString();
+        console.error(`Backend stderr: ${output}`);
+        if (output.includes('INIT_STATUS:ERROR:')) {
+            sendStatus(output.replace('INIT_STATUS:ERROR:', '').trim());
+        }
+    });
+
+    backendProcess.on('close', (code) => {
+        console.log(`Backend process exited with code ${code}`);
+        if (code !== 0 && loadingWindow && !loadingWindow.isDestroyed()) {
+            sendStatus(`后端服务异常退出，错误码: ${code}`);
+        }
+    });
+
+    backendProcess.on('error', (err) => {
+        console.error('Failed to start backend process.', err);
+        sendStatus(`无法启动后端服务: ${err.message}`);
+    });
 }
 
 // IPC Handlers - register only once at app startup
@@ -187,6 +154,21 @@ ipcMain.handle('dialog:openDirectory', async () => {
   }
 });
 
+ipcMain.on('cancel-initialization', () => {
+    if (backendProcess && !backendProcess.killed) {
+        kill(backendProcess.pid, 'SIGKILL', (err) => {
+            if (err) {
+                console.error('Failed to kill backend process tree:', err);
+            } else {
+                console.log('Successfully killed backend process tree.');
+            }
+            app.quit();
+        });
+    } else {
+        app.quit();
+    }
+});
+
 ipcMain.on('file:open', (event, filePath) => {
   shell.openPath(filePath);
 });
@@ -202,32 +184,22 @@ ipcMain.on('update-title', (event, { queue_size, active_threads }) => {
   }
 });
 
-app.whenReady().then(async () => {
-  const venvPath = path.join(app.getPath('home'), '.search_app', '.venv');
-  
-  if (!fs.existsSync(venvPath)) {
-    // 显示初始化窗口
-    const initWindow = createInitializationWindow();
-    
-    try {
-      await checkAndInitializePythonEnv();
-      initWindow.close();
-      startBackend();
-      createMainWindow();
-    } catch (error) {
-      console.error('初始化失败:', error);
-      initWindow.webContents.send('env-initialization-error', error.message);
-    }
-  } else {
-    startBackend();
-    createMainWindow();
-  }
+app.whenReady().then(() => {
+    const loadingWindow = createLoadingWindow();
+    startBackend(loadingWindow);
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createMainWindow();
-    }
-  });
+    app.on('activate', () => {
+        if (BrowserWindow.getAllWindows().length === 0) {
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.show();
+            } else if (loadingWindow && !loadingWindow.isDestroyed()) {
+                loadingWindow.show();
+            } else {
+                const newLoadingWindow = createLoadingWindow();
+                startBackend(newLoadingWindow);
+            }
+        }
+    });
 });
 
 app.on('window-all-closed', () => {
