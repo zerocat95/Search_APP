@@ -201,6 +201,10 @@ def process_file_task(file_info, space_id):
 def run_indexing_task(space_id: int):
     try:
         db_manager.start()
+        
+        # 清理已删除的文件记录（避免数据库无限增长）
+        cleanup_deleted_files(space_id)
+        
         db_manager.execute_write("UPDATE spaces SET status = ?, scanned_files_count = 0, total_files_to_process = 0, processed_files_count = 0, failed_files_count = 0 WHERE id = ?", ('scanning', space_id))
         
         paths = db_manager.execute_read("SELECT path FROM space_paths WHERE space_id = ?", (space_id,))
@@ -312,6 +316,41 @@ def run_indexing_task(space_id: int):
             pass
     finally:
         db_manager.stop()
+
+def cleanup_deleted_files(space_id: int):
+    """清理已删除的文件记录，释放数据库空间"""
+    try:
+        logger.info(f"开始清理space {space_id}的已删除文件记录...")
+        
+        # 获取所有数据库中的文件路径
+        db_files = db_manager.execute_read("SELECT id, path FROM files WHERE space_id = ?", (space_id,))
+        deleted_count = 0
+        
+        for file_record in db_files:
+            file_id, file_path = file_record['id'], file_record['path']
+            if not os.path.exists(file_path):
+                # 文件已删除，清理相关数据
+                db_manager.execute_write("DELETE FROM chunks WHERE file_id = ?", (file_id,))
+                db_manager.execute_write("DELETE FROM files WHERE id = ?", (file_id,))
+                deleted_count += 1
+        
+        if deleted_count > 0:
+            logger.info(f"已清理 {deleted_count} 个已删除文件的记录")
+            # 执行数据库压缩
+            db_manager.execute_write("VACUUM")
+            logger.info("数据库已压缩")
+            
+    except Exception as e:
+        logger.error(f"清理已删除文件时出错: {e}")
+
+def compact_database():
+    """手动压缩数据库"""
+    try:
+        logger.info("开始手动压缩数据库...")
+        db_manager.execute_write("VACUUM")
+        logger.info("数据库压缩完成")
+    except Exception as e:
+        logger.error(f"数据库压缩失败: {e}")
 
 def build_faiss_index(space_id: int):
     logger.info(f"Building Faiss index for space {space_id}...")

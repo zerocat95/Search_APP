@@ -54,15 +54,24 @@ def scan_directories(directories: list[str], space_id: int, ignored_dirs: list[s
                         db_manager.execute_write("UPDATE spaces SET scanned_files_count = ? WHERE id = ?", (scanned_count, space_id))
 
                     # Check if file exists in DB and if it needs updating
-                    result = db_manager.execute_read("SELECT id, last_modified, md5 FROM files WHERE path = ? AND space_id = ?", (file_path, space_id))
+                    result = db_manager.execute_read("SELECT id, last_modified, md5, size FROM files WHERE path = ? AND space_id = ?", (file_path, space_id))
 
                     if result:
-                        file_id, db_last_modified, db_md5 = result[0]
+                        file_id, db_last_modified, db_md5, db_size = result[0]
                         # Check if the file has any chunks associated with it
-                        chunk_exists = db_manager.execute_read("SELECT 1 FROM chunks WHERE file_id = ? LIMIT 1", (file_id,))
+                        chunk_count = db_manager.execute_read("SELECT COUNT(*) as cnt FROM chunks WHERE file_id = ?", (file_id,))[0]['cnt']
                         
-                        # Condition to re-index: modified file OR no chunks exist for it
-                        if db_last_modified != last_modified or db_md5 != md5 or not chunk_exists:
+                        # 更精确的变化检测：同时检查时间戳、MD5和文件大小
+                        # 容差：时间戳差异在2秒内认为相同（避免文件系统精度问题）
+                        time_diff = abs(db_last_modified - last_modified)
+                        has_changed = (
+                            time_diff > 2.0 or  # 2秒容差
+                            db_md5 != md5 or 
+                            db_size != size or
+                            chunk_count == 0
+                        )
+                        
+                        if has_changed:
                             files_to_process.append({
                                 "file_id": file_id,
                                 "path": file_path,

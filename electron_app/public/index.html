@@ -611,7 +611,7 @@
                         `;
                     } else {
                         detailsHtml = `
-                            状态：${s.status || '空闲'} | 文件：${s.indexed_file_count || 0} | 最后索引：${s.last_indexed_at ? new Date(s.last_indexed_at).toLocaleString() : 'N/A'}
+                            状态：${s.status || '空闲'} | 文件：${s.processed_files_count || 0} | 最后索引：${s.last_indexed_at ? new Date(s.last_indexed_at).toLocaleString() : 'N/A'}
                         `;
                     }
 
