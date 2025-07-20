@@ -6,7 +6,13 @@
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
 
 # 激活虚拟环境
-source "$SCRIPT_DIR/.venv/bin/activate"
+VENV_DIR="$HOME/.search_app/.venv"
+if [ ! -d "$VENV_DIR" ]; then
+    echo "错误: Python虚拟环境不存在，请先运行重建脚本"
+    echo "虚拟环境路径: $VENV_DIR"
+    exit 1
+fi
+source "$VENV_DIR/bin/activate"
 
 # 设置环境变量
 export HF_ENDPOINT="https://hf-mirror.com"

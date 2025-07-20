@@ -3,8 +3,9 @@
 echo "Rebuilding virtual environment and installing dependencies..."
 
 # Recreate Python virtual environment and install dependencies
-python3 -m venv .venv
-source .venv/bin/activate
+VENV_DIR="$HOME/.search_app/.venv"
+python3 -m venv "$VENV_DIR"
+source "$VENV_DIR/bin/activate"
 pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org --upgrade pip
 pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org -r requirements.txt
 

@@ -49,7 +49,26 @@ function readConfig() {
   }
 }
 
-function createWindow() {
+function createInitializationWindow() {
+  const initWindow = new BrowserWindow({
+    width: 500,
+    height: 400,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      nodeIntegration: false,
+      contextIsolation: true,
+    },
+    frame: false,
+    resizable: false,
+    alwaysOnTop: true,
+    center: true,
+  });
+
+  initWindow.loadFile(path.join(__dirname, 'public', 'initialization.html'));
+  return initWindow;
+}
+
+function createMainWindow() {
   mainWindow = new BrowserWindow({
     width: 1000,
     height: 800,
@@ -75,11 +94,68 @@ function createWindow() {
   //mainWindow.webContents.openDevTools();
 }
 
+async function checkAndInitializePythonEnv() {
+  const venvPath = path.join(app.getPath('home'), '.search_app', '.venv');
+  const requirementsPath = path.join(app.getAppPath(), '..', 'requirements.txt');
+  const initScriptPath = path.join(app.getAppPath(), '..', 'init_python_env.sh');
+
+  if (!fs.existsSync(venvPath)) {
+    console.log('Python虚拟环境不存在，开始初始化...');
+    
+    // 发送初始化状态给前端
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('env-initialization-start');
+    }
+
+    return new Promise((resolve, reject) => {
+      const initProcess = spawn('/bin/bash', [initScriptPath, requirementsPath], {
+        cwd: path.join(app.getAppPath(), '..')
+      });
+
+      initProcess.stdout.on('data', (data) => {
+        console.log(`Init stdout: ${data}`);
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('env-initialization-progress', data.toString());
+        }
+      });
+
+      initProcess.stderr.on('data', (data) => {
+        console.error(`Init stderr: ${data}`);
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('env-initialization-progress', data.toString());
+        }
+      });
+
+      initProcess.on('close', (code) => {
+        if (code === 0) {
+          console.log('Python环境初始化完成');
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('env-initialization-complete');
+          }
+          resolve();
+        } else {
+          console.error(`Python环境初始化失败，退出码: ${code}`);
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('env-initialization-error', `初始化失败，退出码: ${code}`);
+          }
+          reject(new Error(`Python环境初始化失败`));
+        }
+      });
+    });
+  } else {
+    console.log('Python虚拟环境已存在');
+    return Promise.resolve();
+  }
+}
+
 function startBackend() {
-  const scriptPath = path.join(app.getAppPath(), '..', 'start_backend.sh');
+  const venvPath = path.join(app.getPath('home'), '.search_app', '.venv');
+  const scriptPath = path.join(venvPath, 'bin', 'python');
+  const mainPyPath = path.join(app.getAppPath(), '..', 'main.py');
   
-  backendProcess = spawn('/bin/bash', [scriptPath], {
-    cwd: path.join(app.getAppPath(), '..') // Set working directory to project root
+  // 使用虚拟环境中的Python运行main.py
+  backendProcess = spawn(scriptPath, [mainPyPath], {
+    cwd: path.join(app.getAppPath(), '..')
   });
 
   backendProcess.stdout.on('data', (data) => {
@@ -126,13 +202,30 @@ ipcMain.on('update-title', (event, { queue_size, active_threads }) => {
   }
 });
 
-app.whenReady().then(() => {
-  startBackend();
-  createWindow();
+app.whenReady().then(async () => {
+  const venvPath = path.join(app.getPath('home'), '.search_app', '.venv');
+  
+  if (!fs.existsSync(venvPath)) {
+    // 显示初始化窗口
+    const initWindow = createInitializationWindow();
+    
+    try {
+      await checkAndInitializePythonEnv();
+      initWindow.close();
+      startBackend();
+      createMainWindow();
+    } catch (error) {
+      console.error('初始化失败:', error);
+      initWindow.webContents.send('env-initialization-error', error.message);
+    }
+  } else {
+    startBackend();
+    createMainWindow();
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
+      createMainWindow();
     }
   });
 });
